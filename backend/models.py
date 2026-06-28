@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -28,5 +28,15 @@ class Booking(Base):
     route_id = Column(Integer, ForeignKey("routes.id"), index=True)
     status = Column(String, default="CONFIRMED")
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    payment_status = Column(String, default="pending")
+    payment_order_id = Column(String, nullable=True)
+    payment_id = Column(String, nullable=True)
+    fare = Column(Float)
+    source = Column(String)
+    destination = Column(String)
+    distance_km = Column(Float)
+    booked_at = Column(DateTime, default=datetime.utcnow)
+
     user = relationship("User", back_populates="bookings")
     route = relationship("Route", back_populates="bookings")

@@ -1,222 +1,250 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import MapComponent from '../components/MapComponent';
-import { calculateDuration } from '../utils/timeUtils';
+import './HomePage.css';
 
-export default function HomePage({ token, onNavigate, onLogout }) {
-  const [destination, setDestination] = useState('');
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
+export default function HomePage({ onNavigate }) {
+  const [activeView, setActiveView] = useState('home');
+  const [touchStart, setTouchStart] = useState(null);
 
-  const API_URL = 'http://localhost:8000';
-
-  useEffect(() => {
-    async function fetchBookings() {
-      try {
-        const response = await fetch(`${API_URL}/booking/my-bookings`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        if (response.ok) {
-          // Sort by newest bookings
-          setBookings(data.reverse());
-        } else {
-          setError(data.detail || 'Failed to load bookings');
-        }
-      } catch (err) {
-        setError('Network error loading dashboard');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchBookings();
-  }, [token]);
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (destination.trim()) {
-      window.searchDestination = destination.trim();
-      onNavigate('search');
-    }
-  };
-
-  const nextTrip = () => {
-    if (bookings.length > 1) {
-      setCurrentIndex((prevIndex) => (prevIndex + 1) % bookings.length);
-    }
-  };
-
-  const prevTrip = () => {
-    if (bookings.length > 1) {
-      setCurrentIndex((prevIndex) => (prevIndex - 1 + bookings.length) % bookings.length);
-    }
-  };
-
-  // Get active trip to display
-  const activeBooking = bookings.length > 0 ? bookings[currentIndex] : null;
-
-  // Helper to resolve transit icon
-  const getTransitIcon = (transport) => {
-    switch (transport?.toLowerCase()) {
-      case 'flight': return '✈️';
-      case 'train': return '🚂';
-      case 'bus': return '🚌';
-      case 'cab': return '🚗';
-      default: return '🚌';
-    }
+  const handleTouchStart = (e) => setTouchStart(e.targetTouches[0].clientX);
+  
+  const handleTouchEnd = (e) => {
+    if (!touchStart) return;
+    const distance = touchStart - e.changedTouches[0].clientX;
+    if (activeView === 'home' && distance > 50) setActiveView('profile');
+    if (activeView === 'home' && distance < -50) setActiveView('ai');
+    if (activeView === 'profile' && distance < -50) setActiveView('home');
+    if (activeView === 'ai' && distance > 50) setActiveView('home');
+    setTouchStart(null);
   };
 
   return (
-    <div className="home-page">
-      {/* Header */}
-      <div className="home-header">
-        <div className="header-logo" onClick={() => onNavigate('home')} style={{ cursor: 'pointer' }}>🚌 WAY</div>
-        <div className="header-icons">
-          <button className="icon-btn qr-btn" onClick={() => onNavigate('bookings')} title="My Bookings">🧭</button>
-          <button className="icon-btn profile-btn" onClick={onLogout} title="Logout">🚪</button>
+    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} className="home-wrapper">
+      {activeView === 'profile' && <ProfileView />}
+      {activeView === 'home' && <HomeMainView onNavigate={onNavigate} />}
+      {activeView === 'ai' && <AIHelperView />}
+    </div>
+  );
+}
+
+function HomeMainView({ onNavigate }) {
+  return (
+    <section className="home-container">
+      <HomeHeader onNavigate={onNavigate} />
+      {/* Flight Card removed to match Node 3:1871 */}
+      <MapSearchArea onNavigate={onNavigate} />
+      <ChatCategory />
+      <TravelSavings />
+      <Recommendations />
+    </section>
+  );
+}
+
+function HomeHeader({ onNavigate }) {
+  return (
+    <div className="home-header-new">
+      <div className="home-greeting">
+        <span className="wave">👋</span>
+        <span className="greeting-text">HelloDaniel!</span>
+      </div>
+      <div className="home-header-icons">
+        <button className="icon-btn-round">📅</button>
+        <button className="icon-btn-round" onClick={() => onNavigate('bookings')}>🔔</button>
+      </div>
+    </div>
+  );
+}
+
+function MapSearchArea({ onNavigate }) {
+  return (
+    <div className="map-search-area">
+      <div className="map-wrapper">
+        <MapComponent useDefaultStyle={true} />
+        <div className="temperature-pill">32°C ☀️</div>
+      </div>
+      <div className="search-overlay" onClick={() => onNavigate('search')}>
+        <span className="search-icon">🔍</span>
+        <span className="search-placeholder">Where to?</span>
+      </div>
+    </div>
+  );
+}
+
+function ChatCategory() {
+  return (
+    <div className="chat-category-section">
+      <div className="chat-header">
+        <span className="chat-logo">✨</span>
+        <div className="chat-title">
+          <span>Ai lorem lorem</span>
+          <span className="chat-date">19'Mar'26 | 11:36</span>
         </div>
       </div>
-
-      {/* Map Section */}
-      <div className="map-section">
-        <div className="map-placeholder">
-          {activeBooking ? (
-            <MapComponent
-              source={activeBooking.route.source}
-              destination={activeBooking.route.destination}
-              transport={activeBooking.route.transport}
-            />
-          ) : (
-            <MapComponent centerCity="mumbai" />
-          )}
-        </div>
-
-        {/* Location Badge */}
-        <div className="location-badge">
-          <span className="location-icon">📍</span>
-          <span className="location-text">
-            {activeBooking 
-              ? `${activeBooking.route.source} → ${activeBooking.route.destination} (${activeBooking.route.transport})` 
-              : 'Mumbai, India'}
-          </span>
-        </div>
-
-        {/* Info Icon */}
-        <button className="info-btn" onClick={() => alert("WAY Transit Interactive Map - Shows your active transit routes and ETA.")}>ℹ️</button>
-
-        {/* Nearby Transits */}
-        <div className="nearby-transits">
-          <div className="transit-label">Transit Modes</div>
-          <div className="transit-icons">
-            <div className="transit-icon" title="Bus">🚌</div>
-            <div className="transit-icon" title="Train">🚂</div>
-            <div className="transit-icon" title="Flight">✈️</div>
-            <div className="transit-icon" title="Cab">🚗</div>
-          </div>
-        </div>
+      <div className="chat-dropdown">
+        <span>Chat Category</span>
+        <span>⌄</span>
       </div>
-
-      {/* Search Bar */}
-      <form onSubmit={handleSearchSubmit} className="search-bar-container">
-        <div className="search-bar">
-          <span className="search-icon">🔍</span>
-          <input 
-            type="text" 
-            placeholder="Where To? (e.g. Pune)" 
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-          />
-          <button type="submit" style={{ display: 'none' }}></button>
-          <button type="button" className="voice-btn" onClick={() => alert("Voice input not supported in MVP")}>🎤</button>
+      <div className="chat-cards">
+        <div className="chat-card suggested">
+          <span>Suggested Chat</span>
+          <h3>Aesthetic Cafés Near You ↗</h3>
         </div>
-        <button type="submit" className="notification-btn" title="Search">🔔</button>
-      </form>
-
-      {/* Bottom Cards Section */}
-      <div className="cards-grid">
-        {/* Upcoming Trips Card */}
-        <div className="card upcoming-card">
-          <div className="card-header">
-            <span className="card-title">
-              {bookings.length > 0 
-                ? `Upcoming Trips (${currentIndex + 1} of ${bookings.length})` 
-                : 'No Upcoming Trips'}
-            </span>
-            {bookings.length > 1 && (
-              <div className="nav-arrows">
-                <button className="arrow left" onClick={prevTrip}>‹</button>
-                <button className="arrow right" onClick={nextTrip}>›</button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Trip Details Card - Left */}
-        {activeBooking ? (
-          <div className="card trip-details-card" onClick={() => onNavigate('bookings')} style={{ cursor: 'pointer' }}>
-            <div className="ticket-badge">Tickets Booked</div>
-            
-            <div className="trip-info">
-              <div className="temperature">☀️ 28°C &bull; {calculateDuration(activeBooking.route.departure_time, activeBooking.route.arrival_time)}</div>
-              <div className="transit-row">
-                <div className="transit-icon-small">{getTransitIcon(activeBooking.route.transport)}</div>
-              </div>
-            </div>
-
-            <div className="trip-time">
-              <div className="trip-route">{activeBooking.route.source} → {activeBooking.route.destination}</div>
-              <div className="trip-time-text">{activeBooking.route.departure_time} - {activeBooking.route.arrival_time}</div>
-            </div>
-          </div>
-        ) : (
-          <div className="card trip-details-card" onClick={() => onNavigate('search')} style={{ cursor: 'pointer' }}>
-            <div className="ticket-badge" style={{ backgroundColor: '#7f8c8d' }}>No Bookings</div>
-            
-            <div className="trip-info">
-              <div className="temperature">Ready to travel?</div>
-            </div>
-
-            <div className="trip-time">
-              <div className="trip-route">Where to next?</div>
-              <div className="trip-time-text">Find routes and book a ride</div>
-            </div>
-          </div>
-        )}
-
-        {/* Plan a Trip Card - Right */}
-        <div className="card plan-trip-card" onClick={() => onNavigate('search')} style={{ cursor: 'pointer' }}>
-          <div className="plan-trip-content">
-            <div className="plan-trip-text">
-              <div className="plan-label">Plan a trip</div>
-              <div className="plan-tagline">Find Your Way</div>
-            </div>
-            <div className="plan-trip-number">{bookings.length}</div>
-          </div>
-        </div>
-
-        {/* Quick Actions - Bottom Left */}
-        <div className="quick-actions-row">
-          <button className="quick-action-btn" onClick={() => onNavigate('bookings')} title="Bookings">
-            <div className="action-icon">👥</div>
-          </button>
-          <button className="quick-action-btn with-badge" onClick={() => onNavigate('search')} title="Search">
-            <div className="action-icon">🧭</div>
-            <div className="badge">5</div>
-          </button>
-        </div>
-      </div>
-
-      {/* Promo Card */}
-      <div className="promo-card">
-        <div className="promo-content">
-          <div className="promo-text">
-            <div className="promo-title">Get discounts, perks & other benefits</div>
-            <div className="promo-subtitle">on purchases with way credits</div>
-          </div>
-          <div className="promo-time">→ 08:32 - ← 14:32</div>
+        <div className="chat-card planning">
+          <span>Continue Planning</span>
+          <h3>Get Away Weekend Trip ↗</h3>
         </div>
       </div>
     </div>
+  );
+}
+
+function TravelSavings() {
+  return (
+    <div className="travel-savings">
+      <div className="savings-header">
+        <span>Travel Savings</span>
+        <div className="savings-month">May, 2026 ⌄</div>
+      </div>
+      <div className="savings-amount">
+        <h2>₹45</h2>
+        <span>Saved</span>
+      </div>
+      <div className="savings-progress">
+        <div className="progress-bar"><div className="progress-fill"></div></div>
+        <div className="progress-labels"><span>Trips</span><span>Reward</span></div>
+      </div>
+      <button className="history-btn">Check Travel History ↗</button>
+    </div>
+  );
+}
+
+function Recommendations() {
+  return (
+    <div className="recommendations">
+      <div className="rec-search">
+        <span className="search-icon">🔍</span>
+        <input type="text" placeholder="Recommendations For You...." />
+        <button className="filter-btn">⚙️</button>
+      </div>
+      <div className="rec-tags">
+        <button className="tag active">For You</button>
+        <button className="tag">Trending</button>
+        <button className="tag">Live Events</button>
+      </div>
+      <div className="event-card">
+        <div className="event-info">
+          <h3>Event Name</h3>
+          <span>14 May, 2026 | 4.2 ★</span>
+        </div>
+        <button className="swipe-book-btn">Swipe to Book Trip &gt;&gt;</button>
+      </div>
+    </div>
+  );
+}
+
+function ProfileView() {
+  return (
+    <section className="profile-container">
+      <ProfileHeader />
+      <StudentPass />
+      <TravelDiary />
+      <ProfileStats />
+      <ProfileMenu />
+    </section>
+  );
+}
+
+function ProfileHeader() {
+  return (
+    <>
+      <div className="profile-header">
+        <div className="avatar">👩‍🎨</div>
+        <h2>Daniel Smith</h2>
+        <p>📍 Navi Mumbai | 32 Trips</p>
+      </div>
+      <div className="profile-cards">
+        <div className="p-card">Documents ↗</div>
+        <div className="p-card">Help ↗</div>
+        <div className="p-card">FAQ ↗</div>
+      </div>
+    </>
+  );
+}
+
+function StudentPass() {
+  return (
+    <div className="student-pass-card">
+      <div className="pass-header">
+        <span className="pass-train">12S Churchgate</span>
+        <span className="pass-class">II Class</span>
+        <span className="pass-platform">P3 Platform</span>
+      </div>
+      <div className="qr-section">
+        <h2>CHS</h2>
+        <div className="qr-code">QR</div>
+        <h2>BA</h2>
+      </div>
+      <p className="pass-validity">Student Pass<br/>02/07/2026 - 05/07/2026</p>
+    </div>
+  );
+}
+
+function TravelDiary() {
+  return (
+    <>
+      <div className="travel-diary">
+        <h3>Your travel diary 📓</h3>
+        <p>Relive your journeys - places you've been...</p>
+        <button className="view-all-btn">View All</button>
+      </div>
+      <div className="profile-actions">
+        <div className="action-box">Booking History ↗</div>
+        <div className="action-box">Goals & Rewards ↗</div>
+      </div>
+    </>
+  );
+}
+
+function ProfileStats() {
+  return (
+    <div className="stats-box">
+      <h2>23hrs <span className="saved-text">Saved</span></h2>
+      <p>38.5 km across 32 trips / 50 trips</p>
+      <div className="trip-modes-bar">
+        <div className="mode bus">🚌</div>
+        <div className="mode train">🚆</div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileMenu() {
+  return (
+    <div className="bottom-actions">
+       <button className="menu-btn">↗ Way Offline</button>
+       <button className="menu-btn">Logout</button>
+       <button className="menu-btn danger">Delete Account</button>
+    </div>
+  );
+}
+
+function AIHelperView() {
+  return (
+    <section className="ai-helper-container">
+      <div className="ai-header">
+        <h1>How can we<br/>help you?</h1>
+        <p>50°C | 19'Mar'26 | 11:36</p>
+      </div>
+      <div className="ai-bubbles">
+        <div className="ai-bubble plan-new">Plan a new<br/>Journey 💼 ↗</div>
+        <div className="ai-bubble plan-weekend">Plan Weekend<br/>Trek 💼 ↗</div>
+        <div className="ai-bubble start-group">Start a Group<br/>Chat 💬 ↗</div>
+      </div>
+      <div className="ask-ai-bar">
+        <span className="ai-icon">✨</span>
+        <input type="text" placeholder="Ask AI" />
+        <span className="mic-icon">🎤</span>
+      </div>
+    </section>
   );
 }

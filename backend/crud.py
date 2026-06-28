@@ -33,6 +33,23 @@ def create_booking(db: Session, user_id: int, route_id: int):
     db.refresh(booking)
     return booking
 
+def create_booking_order(db: Session, user_id: int, route_id: int, source: str, destination: str, distance_km: float, fare: float, payment_order_id: str):
+    booking = models.Booking(
+        user_id=user_id,
+        route_id=route_id,
+        status="PENDING",
+        payment_status="pending",
+        payment_order_id=payment_order_id,
+        fare=fare,
+        source=source,
+        destination=destination,
+        distance_km=distance_km
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return booking
+
 def create_route(db: Session, source: str, destination: str, transport: str, departure_time: str, arrival_time: str, price: int):
     route = models.Route(
         source=source,

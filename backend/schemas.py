@@ -36,13 +36,33 @@ class RouteResponse(BaseModel):
 class BookingCreate(BaseModel):
     route_id: int
 
+class BookingCreateOrder(BaseModel):
+    route_id: int
+    source: str
+    destination: str
+    distance_km: float
+
+class PaymentVerify(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    booking_id: int
+
 class BookingResponse(BaseModel):
     id: int
     user_id: int
     route_id: int
     status: str
     created_at: datetime
-    route: RouteResponse
+    payment_status: Optional[str] = None
+    payment_order_id: Optional[str] = None
+    payment_id: Optional[str] = None
+    fare: Optional[float] = None
+    source: Optional[str] = None
+    destination: Optional[str] = None
+    distance_km: Optional[float] = None
+    booked_at: Optional[datetime] = None
+    route: Optional[RouteResponse] = None
     
     class Config:
         from_attributes = True

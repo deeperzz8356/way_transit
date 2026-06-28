@@ -1,0 +1,1731 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "auth.py",
+      "file_type": "code",
+      "source_file": "backend/auth.py",
+      "source_location": "L1",
+      "community": 5,
+      "norm_label": "auth.py",
+      "id": "backend_auth_py"
+    },
+    {
+      "label": "hash_password()",
+      "file_type": "code",
+      "source_file": "backend/auth.py",
+      "source_location": "L13",
+      "community": 5,
+      "norm_label": "hash_password()",
+      "id": "backend_auth_hash_password"
+    },
+    {
+      "label": "verify_password()",
+      "file_type": "code",
+      "source_file": "backend/auth.py",
+      "source_location": "L16",
+      "community": 5,
+      "norm_label": "verify_password()",
+      "id": "backend_auth_verify_password"
+    },
+    {
+      "label": "create_access_token()",
+      "file_type": "code",
+      "source_file": "backend/auth.py",
+      "source_location": "L19",
+      "community": 5,
+      "norm_label": "create_access_token()",
+      "id": "backend_auth_create_access_token"
+    },
+    {
+      "label": "crud.py",
+      "file_type": "code",
+      "source_file": "backend/crud.py",
+      "source_location": "L1",
+      "community": 3,
+      "norm_label": "crud.py",
+      "id": "backend_crud_py"
+    },
+    {
+      "label": "create_user()",
+      "file_type": "code",
+      "source_file": "backend/crud.py",
+      "source_location": "L5",
+      "community": 3,
+      "norm_label": "create_user()",
+      "id": "backend_crud_create_user"
+    },
+    {
+      "label": "get_user_by_email()",
+      "file_type": "code",
+      "source_file": "backend/crud.py",
+      "source_location": "L13",
+      "community": 3,
+      "norm_label": "get_user_by_email()",
+      "id": "backend_crud_get_user_by_email"
+    },
+    {
+      "label": "get_user_by_id()",
+      "file_type": "code",
+      "source_file": "backend/crud.py",
+      "source_location": "L16",
+      "community": 3,
+      "norm_label": "get_user_by_id()",
+      "id": "backend_crud_get_user_by_id"
+    },
+    {
+      "label": "get_routes()",
+      "file_type": "code",
+      "source_file": "backend/crud.py",
+      "source_location": "L19",
+      "community": 3,
+      "norm_label": "get_routes()",
+      "id": "backend_crud_get_routes"
+    },
+    {
+      "label": "create_booking()",
+      "file_type": "code",
+      "source_file": "backend/crud.py",
+      "source_location": "L25",
+      "community": 3,
+      "norm_label": "create_booking()",
+      "id": "backend_crud_create_booking"
+    },
+    {
+      "label": "create_route()",
+      "file_type": "code",
+      "source_file": "backend/crud.py",
+      "source_location": "L36",
+      "community": 3,
+      "norm_label": "create_route()",
+      "id": "backend_crud_create_route"
+    },
+    {
+      "label": "database.py",
+      "file_type": "code",
+      "source_file": "backend/database.py",
+      "source_location": "L1",
+      "community": 10,
+      "norm_label": "database.py",
+      "id": "backend_database_py"
+    },
+    {
+      "label": "load_dotenv()",
+      "file_type": "code",
+      "source_file": "backend/database.py",
+      "source_location": "L9",
+      "community": 10,
+      "norm_label": "load_dotenv()",
+      "id": "backend_database_load_dotenv"
+    },
+    {
+      "label": "dependencies.py",
+      "file_type": "code",
+      "source_file": "backend/dependencies.py",
+      "source_location": "L1",
+      "community": 1,
+      "norm_label": "dependencies.py",
+      "id": "backend_dependencies_py"
+    },
+    {
+      "label": "main.py",
+      "file_type": "code",
+      "source_file": "backend/main.py",
+      "source_location": "L1",
+      "community": 11,
+      "norm_label": "main.py",
+      "id": "backend_main_py"
+    },
+    {
+      "label": "root()",
+      "file_type": "code",
+      "source_file": "backend/main.py",
+      "source_location": "L24",
+      "community": 11,
+      "norm_label": "root()",
+      "id": "backend_main_root"
+    },
+    {
+      "label": "models.py",
+      "file_type": "code",
+      "source_file": "backend/models.py",
+      "source_location": "L1",
+      "community": 4,
+      "norm_label": "models.py",
+      "id": "backend_models_py"
+    },
+    {
+      "label": "User",
+      "file_type": "code",
+      "source_file": "backend/models.py",
+      "source_location": "L6",
+      "community": 4,
+      "norm_label": "user",
+      "id": "backend_models_user"
+    },
+    {
+      "label": "Base",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "community": 4,
+      "norm_label": "base",
+      "id": "base"
+    },
+    {
+      "label": "Route",
+      "file_type": "code",
+      "source_file": "backend/models.py",
+      "source_location": "L13",
+      "community": 4,
+      "norm_label": "route",
+      "id": "backend_models_route"
+    },
+    {
+      "label": "Booking",
+      "file_type": "code",
+      "source_file": "backend/models.py",
+      "source_location": "L24",
+      "community": 4,
+      "norm_label": "booking",
+      "id": "backend_models_booking"
+    },
+    {
+      "label": "schemas.py",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L1",
+      "community": 2,
+      "norm_label": "schemas.py",
+      "id": "backend_schemas_py"
+    },
+    {
+      "label": "UserCreate",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L5",
+      "community": 2,
+      "norm_label": "usercreate",
+      "id": "backend_schemas_usercreate"
+    },
+    {
+      "label": "BaseModel",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "community": 2,
+      "norm_label": "basemodel",
+      "id": "basemodel"
+    },
+    {
+      "label": "UserResponse",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L9",
+      "community": 2,
+      "norm_label": "userresponse",
+      "id": "backend_schemas_userresponse"
+    },
+    {
+      "label": "Config",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L13",
+      "community": 2,
+      "norm_label": "config",
+      "id": "backend_schemas_config"
+    },
+    {
+      "label": "RouteCreate",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L16",
+      "community": 2,
+      "norm_label": "routecreate",
+      "id": "backend_schemas_routecreate"
+    },
+    {
+      "label": "RouteResponse",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L24",
+      "community": 2,
+      "norm_label": "routeresponse",
+      "id": "backend_schemas_routeresponse"
+    },
+    {
+      "label": "BookingCreate",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L36",
+      "community": 2,
+      "norm_label": "bookingcreate",
+      "id": "backend_schemas_bookingcreate"
+    },
+    {
+      "label": "BookingResponse",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L39",
+      "community": 2,
+      "norm_label": "bookingresponse",
+      "id": "backend_schemas_bookingresponse"
+    },
+    {
+      "label": "LoginRequest",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L50",
+      "community": 2,
+      "norm_label": "loginrequest",
+      "id": "backend_schemas_loginrequest"
+    },
+    {
+      "label": "TokenResponse",
+      "file_type": "code",
+      "source_file": "backend/schemas.py",
+      "source_location": "L54",
+      "community": 2,
+      "norm_label": "tokenresponse",
+      "id": "backend_schemas_tokenresponse"
+    },
+    {
+      "label": "seed_db.py",
+      "file_type": "code",
+      "source_file": "backend/seed_db.py",
+      "source_location": "L1",
+      "community": 6,
+      "norm_label": "seed_db.py",
+      "id": "backend_seed_db_py"
+    },
+    {
+      "label": "init_db()",
+      "file_type": "code",
+      "source_file": "backend/seed_db.py",
+      "source_location": "L10",
+      "community": 6,
+      "norm_label": "init_db()",
+      "id": "backend_seed_db_init_db"
+    },
+    {
+      "label": "Script to seed the database with sample routes. Run this after creating tables:",
+      "file_type": "rationale",
+      "source_file": "backend/seed_db.py",
+      "source_location": "L1",
+      "community": 6,
+      "norm_label": "script to seed the database with sample routes. run this after creating tables:",
+      "id": "backend_seed_db_rationale_1"
+    },
+    {
+      "label": "Create tables and seed with sample data",
+      "file_type": "rationale",
+      "source_file": "backend/seed_db.py",
+      "source_location": "L11",
+      "community": 6,
+      "norm_label": "create tables and seed with sample data",
+      "id": "backend_seed_db_rationale_11"
+    },
+    {
+      "label": "test_db.py",
+      "file_type": "code",
+      "source_file": "backend/test_db.py",
+      "source_location": "L1",
+      "community": 12,
+      "norm_label": "test_db.py",
+      "id": "backend_test_db_py"
+    },
+    {
+      "label": "test_connection()",
+      "file_type": "code",
+      "source_file": "backend/test_db.py",
+      "source_location": "L4",
+      "community": 12,
+      "norm_label": "test_connection()",
+      "id": "backend_test_db_test_connection"
+    },
+    {
+      "label": "booking.py",
+      "file_type": "code",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L1",
+      "community": 1,
+      "norm_label": "booking.py",
+      "id": "backend_routes_booking_py"
+    },
+    {
+      "label": "book()",
+      "file_type": "code",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L19",
+      "community": 1,
+      "norm_label": "book()",
+      "id": "routes_booking_book"
+    },
+    {
+      "label": "get_my_bookings()",
+      "file_type": "code",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L43",
+      "community": 1,
+      "norm_label": "get_my_bookings()",
+      "id": "routes_booking_get_my_bookings"
+    },
+    {
+      "label": "Book a route (requires auth token)",
+      "file_type": "rationale",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L24",
+      "community": 1,
+      "norm_label": "book a route (requires auth token)",
+      "id": "routes_booking_rationale_24"
+    },
+    {
+      "label": "Get all bookings for current user (requires auth token)",
+      "file_type": "rationale",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L47",
+      "community": 1,
+      "norm_label": "get all bookings for current user (requires auth token)",
+      "id": "routes_booking_rationale_47"
+    },
+    {
+      "label": "search.py",
+      "file_type": "code",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L1",
+      "community": 3,
+      "norm_label": "search.py",
+      "id": "backend_routes_search_py"
+    },
+    {
+      "label": "search()",
+      "file_type": "code",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L18",
+      "community": 3,
+      "norm_label": "search()",
+      "id": "routes_search_search"
+    },
+    {
+      "label": "Search routes by source and destination",
+      "file_type": "rationale",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L19",
+      "community": 3,
+      "norm_label": "search routes by source and destination",
+      "id": "routes_search_rationale_19"
+    },
+    {
+      "label": "Get single route details by ID",
+      "file_type": "rationale",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L24",
+      "community": 3,
+      "norm_label": "get single route details by id",
+      "id": "routes_search_rationale_24"
+    },
+    {
+      "label": "user.py",
+      "file_type": "code",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L1",
+      "community": 1,
+      "norm_label": "user.py",
+      "id": "backend_routes_user_py"
+    },
+    {
+      "label": "get_db()",
+      "file_type": "code",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L12",
+      "community": 1,
+      "norm_label": "get_db()",
+      "id": "routes_user_get_db"
+    },
+    {
+      "label": "signup()",
+      "file_type": "code",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L20",
+      "community": 1,
+      "norm_label": "signup()",
+      "id": "routes_user_signup"
+    },
+    {
+      "label": "login()",
+      "file_type": "code",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L31",
+      "community": 1,
+      "norm_label": "login()",
+      "id": "routes_user_login"
+    },
+    {
+      "label": "get_current_user_info()",
+      "file_type": "code",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L48",
+      "community": 1,
+      "norm_label": "get_current_user_info()",
+      "id": "routes_user_get_current_user_info"
+    },
+    {
+      "label": "Login and get JWT token",
+      "file_type": "rationale",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L32",
+      "community": 1,
+      "norm_label": "login and get jwt token",
+      "id": "routes_user_rationale_32"
+    },
+    {
+      "label": "Get current user info (requires auth token)",
+      "file_type": "rationale",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L52",
+      "community": 1,
+      "norm_label": "get current user info (requires auth token)",
+      "id": "routes_user_rationale_52"
+    },
+    {
+      "label": "vite.config.js",
+      "file_type": "code",
+      "source_file": "frontend/vite.config.js",
+      "source_location": "L1",
+      "community": 13,
+      "norm_label": "vite.config.js",
+      "id": "frontend_vite_config_js"
+    },
+    {
+      "label": "App.jsx",
+      "file_type": "code",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L1",
+      "community": 0,
+      "norm_label": "app.jsx",
+      "id": "frontend_src_app_jsx"
+    },
+    {
+      "label": "App()",
+      "file_type": "code",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L12",
+      "community": 0,
+      "norm_label": "app()",
+      "id": "src_app_app"
+    },
+    {
+      "label": "main.jsx",
+      "file_type": "code",
+      "source_file": "frontend/src/main.jsx",
+      "source_location": "L1",
+      "community": 0,
+      "norm_label": "main.jsx",
+      "id": "frontend_src_main_jsx"
+    },
+    {
+      "label": "mapContainerStyle",
+      "file_type": "code",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L4",
+      "community": 0,
+      "norm_label": "mapcontainerstyle",
+      "id": "components_mapcomponent_mapcontainerstyle"
+    },
+    {
+      "label": "defaultCenter",
+      "file_type": "code",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L11",
+      "community": 0,
+      "norm_label": "defaultcenter",
+      "id": "components_mapcomponent_defaultcenter"
+    },
+    {
+      "label": "TRANSIT_COLORS",
+      "file_type": "code",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L16",
+      "community": 0,
+      "norm_label": "transit_colors",
+      "id": "components_mapcomponent_transit_colors"
+    },
+    {
+      "label": "libraries",
+      "file_type": "code",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L23",
+      "community": 0,
+      "norm_label": "libraries",
+      "id": "components_mapcomponent_libraries"
+    },
+    {
+      "label": "MapComponent()",
+      "file_type": "code",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L25",
+      "community": 0,
+      "norm_label": "mapcomponent()",
+      "id": "components_mapcomponent_mapcomponent"
+    },
+    {
+      "label": "BookingPage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/BookingPage.jsx",
+      "source_location": "L5",
+      "community": 0,
+      "norm_label": "bookingpage()",
+      "id": "pages_bookingpage_bookingpage"
+    },
+    {
+      "label": "HomePage.jsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/HomePage.jsx",
+      "source_location": "L1",
+      "community": 0,
+      "norm_label": "homepage.jsx",
+      "id": "frontend_src_pages_homepage_jsx"
+    },
+    {
+      "label": "HomePage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/HomePage.jsx",
+      "source_location": "L6",
+      "community": 0,
+      "norm_label": "homepage()",
+      "id": "pages_homepage_homepage"
+    },
+    {
+      "label": "LoginPage.jsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/LoginPage.jsx",
+      "source_location": "L1",
+      "community": 0,
+      "norm_label": "loginpage.jsx",
+      "id": "frontend_src_pages_loginpage_jsx"
+    },
+    {
+      "label": "LoginPage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/LoginPage.jsx",
+      "source_location": "L3",
+      "community": 0,
+      "norm_label": "loginpage()",
+      "id": "pages_loginpage_loginpage"
+    },
+    {
+      "label": "MyBookingsPage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/MyBookingsPage.jsx",
+      "source_location": "L5",
+      "community": 0,
+      "norm_label": "mybookingspage()",
+      "id": "pages_mybookingspage_mybookingspage"
+    },
+    {
+      "label": "transportOptions",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/PreferencesPage.jsx",
+      "source_location": "L3",
+      "community": 7,
+      "norm_label": "transportoptions",
+      "id": "pages_preferencespage_transportoptions"
+    },
+    {
+      "label": "travelPreferences",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/PreferencesPage.jsx",
+      "source_location": "L4",
+      "community": 7,
+      "norm_label": "travelpreferences",
+      "id": "pages_preferencespage_travelpreferences"
+    },
+    {
+      "label": "notificationPreferences",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/PreferencesPage.jsx",
+      "source_location": "L12",
+      "community": 7,
+      "norm_label": "notificationpreferences",
+      "id": "pages_preferencespage_notificationpreferences"
+    },
+    {
+      "label": "PreferencesPage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/PreferencesPage.jsx",
+      "source_location": "L18",
+      "community": 7,
+      "norm_label": "preferencespage()",
+      "id": "pages_preferencespage_preferencespage"
+    },
+    {
+      "label": "recapStats",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProfilePage.jsx",
+      "source_location": "L3",
+      "community": 8,
+      "norm_label": "recapstats",
+      "id": "pages_profilepage_recapstats"
+    },
+    {
+      "label": "shortcuts",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProfilePage.jsx",
+      "source_location": "L9",
+      "community": 8,
+      "norm_label": "shortcuts",
+      "id": "pages_profilepage_shortcuts"
+    },
+    {
+      "label": "ProfilePage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProfilePage.jsx",
+      "source_location": "L19",
+      "community": 8,
+      "norm_label": "profilepage()",
+      "id": "pages_profilepage_profilepage"
+    },
+    {
+      "label": "SearchPage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/SearchPage.jsx",
+      "source_location": "L6",
+      "community": 0,
+      "norm_label": "searchpage()",
+      "id": "pages_searchpage_searchpage"
+    },
+    {
+      "label": "trips",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/TripHistoryPage.jsx",
+      "source_location": "L3",
+      "community": 9,
+      "norm_label": "trips",
+      "id": "pages_triphistorypage_trips"
+    },
+    {
+      "label": "filters",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/TripHistoryPage.jsx",
+      "source_location": "L10",
+      "community": 9,
+      "norm_label": "filters",
+      "id": "pages_triphistorypage_filters"
+    },
+    {
+      "label": "TripHistoryPage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/TripHistoryPage.jsx",
+      "source_location": "L12",
+      "community": 9,
+      "norm_label": "triphistorypage()",
+      "id": "pages_triphistorypage_triphistorypage"
+    },
+    {
+      "label": "timeUtils.js",
+      "file_type": "code",
+      "source_file": "frontend/src/utils/timeUtils.js",
+      "source_location": "L1",
+      "community": 0,
+      "norm_label": "timeutils.js",
+      "id": "frontend_src_utils_timeutils_js"
+    },
+    {
+      "label": "parseTimeToMinutes()",
+      "file_type": "code",
+      "source_file": "frontend/src/utils/timeUtils.js",
+      "source_location": "L6",
+      "community": 0,
+      "norm_label": "parsetimetominutes()",
+      "id": "utils_timeutils_parsetimetominutes"
+    },
+    {
+      "label": "calculateDuration()",
+      "file_type": "code",
+      "source_file": "frontend/src/utils/timeUtils.js",
+      "source_location": "L40",
+      "community": 0,
+      "norm_label": "calculateduration()",
+      "id": "utils_timeutils_calculateduration"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/auth.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_auth_py",
+      "target": "backend_auth_hash_password"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/auth.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_auth_py",
+      "target": "backend_auth_verify_password"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/auth.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_auth_py",
+      "target": "backend_auth_create_access_token"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/crud.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_py",
+      "target": "backend_crud_create_user"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/crud.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_py",
+      "target": "backend_crud_get_user_by_email"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/crud.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_py",
+      "target": "backend_crud_get_user_by_id"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/crud.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_py",
+      "target": "backend_crud_get_routes"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/crud.py",
+      "source_location": "L25",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_py",
+      "target": "backend_crud_create_booking"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/crud.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_py",
+      "target": "backend_crud_create_route"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_get_routes",
+      "target": "backend_routes_search_py"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_crud_get_routes",
+      "target": "routes_search_rationale_24"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_database_py",
+      "target": "backend_database_load_dotenv"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/dependencies.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_dependencies_py",
+      "target": "routes_user_get_db"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/dependencies.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_dependencies_py",
+      "target": "routes_user_get_current_user_info"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_main_py",
+      "target": "backend_main_root"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_models_py",
+      "target": "backend_models_user"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_models_py",
+      "target": "backend_models_route"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_models_py",
+      "target": "backend_models_booking"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_models_user",
+      "target": "base"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "base",
+      "target": "backend_models_route"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "base",
+      "target": "backend_models_booking"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_usercreate"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_userresponse"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L47",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_config"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_routecreate"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_routeresponse"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_bookingcreate"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L39",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_bookingresponse"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L50",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_loginrequest"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_py",
+      "target": "backend_schemas_tokenresponse"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_schemas_usercreate",
+      "target": "basemodel"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "basemodel",
+      "target": "backend_schemas_userresponse"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "basemodel",
+      "target": "backend_schemas_routecreate"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "basemodel",
+      "target": "backend_schemas_routeresponse"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "basemodel",
+      "target": "backend_schemas_bookingcreate"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L39",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "basemodel",
+      "target": "backend_schemas_bookingresponse"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L50",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "basemodel",
+      "target": "backend_schemas_loginrequest"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/schemas.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "basemodel",
+      "target": "backend_schemas_tokenresponse"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/seed_db.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_seed_db_py",
+      "target": "backend_seed_db_init_db"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/seed_db.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_seed_db_py",
+      "target": "backend_seed_db_rationale_1"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/seed_db.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_seed_db_init_db",
+      "target": "backend_seed_db_rationale_11"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/test_db.py",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_test_db_py",
+      "target": "backend_test_db_test_connection"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_booking_py",
+      "target": "routes_user_get_db"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_booking_py",
+      "target": "routes_booking_book"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L43",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_booking_py",
+      "target": "routes_booking_get_my_bookings"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "routes_booking_book",
+      "target": "routes_booking_rationale_24"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/booking.py",
+      "source_location": "L47",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "routes_booking_get_my_bookings",
+      "target": "routes_booking_rationale_47"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_search_py",
+      "target": "routes_user_get_db"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_search_py",
+      "target": "routes_search_search"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/search.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "routes_search_search",
+      "target": "routes_search_rationale_19"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_user_py",
+      "target": "routes_user_get_db"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L20",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_user_py",
+      "target": "routes_user_signup"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L31",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_user_py",
+      "target": "routes_user_login"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "backend_routes_user_py",
+      "target": "routes_user_get_current_user_info"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L32",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "routes_user_login",
+      "target": "routes_user_rationale_32"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routes/user.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "routes_user_get_current_user_info",
+      "target": "routes_user_rationale_52"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "frontend_src_pages_loginpage_jsx"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "frontend_src_pages_homepage_jsx"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "pages_searchpage_searchpage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "pages_bookingpage_bookingpage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "pages_mybookingspage_mybookingspage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "pages_profilepage_profilepage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "pages_preferencespage_preferencespage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "pages_triphistorypage_triphistorypage"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.jsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "src_app_app"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/main.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_app_jsx",
+      "target": "frontend_src_main_jsx"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_mapcontainerstyle",
+      "target": "components_mapcomponent_mapcomponent"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_defaultcenter",
+      "target": "components_mapcomponent_mapcomponent"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L16",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_transit_colors",
+      "target": "components_mapcomponent_mapcomponent"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/MapComponent.jsx",
+      "source_location": "L23",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_libraries",
+      "target": "components_mapcomponent_mapcomponent"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/BookingPage.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_mapcomponent",
+      "target": "pages_bookingpage_bookingpage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/HomePage.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_mapcomponent",
+      "target": "frontend_src_pages_homepage_jsx"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/MyBookingsPage.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_mapcomponent",
+      "target": "pages_mybookingspage_mybookingspage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/SearchPage.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "components_mapcomponent_mapcomponent",
+      "target": "pages_searchpage_searchpage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/BookingPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_bookingpage_bookingpage",
+      "target": "frontend_src_utils_timeutils_js"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/BookingPage.jsx",
+      "source_location": "L123",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_bookingpage_bookingpage",
+      "target": "utils_timeutils_calculateduration"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/HomePage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_pages_homepage_jsx",
+      "target": "frontend_src_utils_timeutils_js"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/HomePage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_pages_homepage_jsx",
+      "target": "utils_timeutils_calculateduration"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/HomePage.jsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_pages_homepage_jsx",
+      "target": "pages_homepage_homepage"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/pages/HomePage.jsx",
+      "source_location": "L160",
+      "weight": 1.0,
+      "source": "pages_homepage_homepage",
+      "target": "utils_timeutils_calculateduration"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/LoginPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_pages_loginpage_jsx",
+      "target": "pages_loginpage_loginpage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/MyBookingsPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_mybookingspage_mybookingspage",
+      "target": "frontend_src_utils_timeutils_js"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/MyBookingsPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_mybookingspage_mybookingspage",
+      "target": "utils_timeutils_calculateduration"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/PreferencesPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_preferencespage_transportoptions",
+      "target": "pages_preferencespage_preferencespage"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/PreferencesPage.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_preferencespage_travelpreferences",
+      "target": "pages_preferencespage_preferencespage"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/PreferencesPage.jsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_preferencespage_notificationpreferences",
+      "target": "pages_preferencespage_preferencespage"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/ProfilePage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_profilepage_recapstats",
+      "target": "pages_profilepage_profilepage"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/ProfilePage.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_profilepage_shortcuts",
+      "target": "pages_profilepage_profilepage"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/SearchPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_searchpage_searchpage",
+      "target": "frontend_src_utils_timeutils_js"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/SearchPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_searchpage_searchpage",
+      "target": "utils_timeutils_calculateduration"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/TripHistoryPage.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_triphistorypage_trips",
+      "target": "pages_triphistorypage_triphistorypage"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/TripHistoryPage.jsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "pages_triphistorypage_filters",
+      "target": "pages_triphistorypage_triphistorypage"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/utils/timeUtils.js",
+      "source_location": "L6",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_utils_timeutils_js",
+      "target": "utils_timeutils_parsetimetominutes"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/utils/timeUtils.js",
+      "source_location": "L40",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "frontend_src_utils_timeutils_js",
+      "target": "utils_timeutils_calculateduration"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/utils/timeUtils.js",
+      "source_location": "L43",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "utils_timeutils_parsetimetominutes",
+      "target": "utils_timeutils_calculateduration"
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "c4b3bc2fcf0219d0bd35cdfcaca7986e39c9bb6f"
+}

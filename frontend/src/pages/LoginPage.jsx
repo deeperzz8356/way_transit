@@ -16,11 +16,23 @@ export default function LoginPage({ onLoginSuccess }) {
 
     try {
       const endpoint = mode === 'login' ? '/user/login' : '/user/signup';
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      
+      let fetchOptions = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      };
+      
+      if (mode === 'login') {
+        const formData = new URLSearchParams();
+        formData.append('username', email);
+        formData.append('password', password);
+        fetchOptions.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+        fetchOptions.body = formData.toString();
+      } else {
+        fetchOptions.headers = { 'Content-Type': 'application/json' };
+        fetchOptions.body = JSON.stringify({ email, password });
+      }
+
+      const response = await fetch(`${API_URL}${endpoint}`, fetchOptions);
 
       const data = await response.json();
 

@@ -15,7 +15,7 @@ def init_db():
     # Check if routes already exist
     existing_routes = db.query(models.Route).count()
     if existing_routes > 0:
-        print("✓ Routes already seeded")
+        print("Routes already seeded")
         db.close()
         return
     
@@ -67,7 +67,7 @@ def init_db():
         crud.create_route(db, **route)
     
     db.close()
-    print(f"✓ Seeded {len(routes)} routes")
+    print(f"Seeded {len(routes)} routes")
 
 if __name__ == "__main__":
     init_db()

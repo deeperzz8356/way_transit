@@ -1,171 +1,93 @@
 import React, { useState, useEffect } from 'react';
 import MapComponent from '../components/MapComponent';
 import { calculateDuration } from '../utils/timeUtils';
+import './SearchPage.css'; // force reload
 
 export default function SearchPage({ token, onBook }) {
-  const [source, setSource] = useState('Mumbai');
-  const [destination, setDestination] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [selectedRoute, setSelectedRoute] = useState(null);
-
-  const API_URL = 'http://localhost:8000';
-
-  // Handle auto-redirect search from homepage
-  useEffect(() => {
-    if (window.searchDestination) {
-      const dest = window.searchDestination;
-      window.searchDestination = null; // Clear to prevent loops
-      setDestination(dest);
-      
-      const autoSearch = async () => {
-        setError('');
-        setLoading(true);
-        try {
-          const response = await fetch(
-            `${API_URL}/search/routes?source=Mumbai&destination=${encodeURIComponent(dest)}`,
-            { headers: { 'Authorization': `Bearer ${token}` } }
-          );
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.detail || 'Search failed');
-          }
-          setResults(data);
-          if (data.length > 0) {
-            setSelectedRoute(data[0]); // default focus on first route
-          }
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
-      };
-      autoSearch();
-    }
-  }, [token]);
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    setSelectedRoute(null);
-
-    try {
-      const response = await fetch(
-        `${API_URL}/search/routes?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Search failed');
-      }
-
-      setResults(data);
-      if (data.length > 0) {
-        setSelectedRoute(data[0]); // default focus on first route
-      }
-    } catch (err) {
-      setError(err.message);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCardClick = (route) => {
-    setSelectedRoute(route);
-  };
+  const [source, setSource] = useState('Mahavir CHS');
+  const [destination, setDestination] = useState('Atlas Skilltech University');
 
   return (
-    <div className="search-container">
-      <h2>Search Routes</h2>
+    <div className="search-page-wrapper">
+      <div className="map-background">
+        <MapComponent useDefaultStyle={true} />
+      </div>
+      <TopOverlay source={source} destination={destination} />
+      <BottomSheet onBook={onBook} />
+    </div>
+  );
+}
 
-      <div className="search-layout">
-        <div className="search-controls">
-          <form onSubmit={handleSearch} className="search-form">
-            <input
-              type="text"
-              placeholder="Source (e.g., Mumbai)"
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Destination (e.g., Pune)"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              required
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-          </form>
-
-          {error && <div className="error">{error}</div>}
-
-          {results.length > 0 && (
-            <div className="results">
-              <h3>Available Routes ({results.length})</h3>
-              <p className="hint-text">Click a route card to view on map</p>
-              <div className="results-list">
-                {results.map((route) => {
-                  const isSelected = selectedRoute && selectedRoute.id === route.id;
-                  return (
-                    <div 
-                      key={route.id} 
-                      className={`route-card ${isSelected ? 'selected' : ''}`}
-                      onClick={() => handleCardClick(route)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="route-header">
-                        <span className="route-name">{route.source} → {route.destination}</span>
-                        <span className="transport-badge" data-transport={route.transport.toLowerCase()}>
-                          {route.transport.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="route-details">
-                        <p><strong>Departure:</strong> {route.departure_time}</p>
-                        <p><strong>Arrival:</strong> {route.arrival_time}</p>
-                        <p><strong>Duration:</strong> {calculateDuration(route.departure_time, route.arrival_time)}</p>
-                      </div>
-                      <div className="route-footer">
-                        <span className="price">₹{route.price}</span>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation(); // prevent card selection trigger
-                            onBook(route.id);
-                          }} 
-                          className="book-btn"
-                        >
-                          Book
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {results.length === 0 && !loading && !error && (
-            <div className="no-results">Enter your route source and destination to view paths.</div>
-          )}
+function TopOverlay({ source, destination }) {
+  return (
+    <div className="search-overlay-top">
+      <div className="route-header-card">
+        <div className="route-endpoints">
+          <div className="endpoint source">
+            <span className="ep-code">MHV</span>
+            <span className="ep-name">{source}</span>
+          </div>
+          <div className="route-distance">
+            <div className="distance-badge">15km</div>
+          </div>
+          <div className="endpoint dest">
+            <span className="ep-code">ATLAS</span>
+            <span className="ep-name">{destination}</span>
+          </div>
         </div>
+        <TransportModes />
+      </div>
+    </div>
+  );
+}
 
-        {/* Route visualization map */}
-        <div className="search-map-container">
-          <MapComponent 
-            source={selectedRoute ? selectedRoute.source : (results.length > 0 ? results[0].source : source)}
-            destination={selectedRoute ? selectedRoute.destination : (results.length > 0 ? results[0].destination : destination)}
-            transport={selectedRoute ? selectedRoute.transport : null}
-            centerCity={source || 'mumbai'}
-          />
+function TransportModes() {
+  return (
+    <div className="transport-modes">
+      <button className="mode-btn active">🚌</button>
+      <button className="mode-btn">🚆</button>
+      <button className="mode-btn">🚝</button>
+    </div>
+  );
+}
+
+function BottomSheet({ onBook }) {
+  const journeys = [
+    { id: 1, title: 'Fastest Journey', price: '35', time: '15 min' },
+    { id: 2, title: 'Comfort Journey', price: '65', time: '15 min' },
+    { id: 3, title: 'Budget Journey', price: '30', time: '15 min' },
+    { id: 4, title: 'Walk Assisted Journey', price: '35', time: '15 min' },
+    { id: 5, title: 'Shortest Journey', price: '35', time: '15 min' }
+  ];
+
+  return (
+    <div className="search-bottom-sheet">
+      <div className="sheet-handle"></div>
+      <div className="journey-list">
+        {journeys.map(j => (
+          <JourneyCard key={j.id} journey={j} onBook={() => onBook(j.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function JourneyCard({ journey, onBook }) {
+  return (
+    <div className="journey-card" onClick={onBook}>
+      <div className="journey-icon">🚝</div>
+      <div className="journey-info">
+        <h4>{journey.title}</h4>
+        <div className="journey-time">
+          <span>🕒 {journey.time}</span>
+          <span className="transfer-dots">
+            <span className="dot bus"></span>
+            <span className="dot train"></span>
+          </span>
         </div>
       </div>
+      <div className="journey-price">₹{journey.price}</div>
+      <button className="go-btn">→</button>
     </div>
   );
 }

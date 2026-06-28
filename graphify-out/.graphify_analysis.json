@@ -1,0 +1,222 @@
+{
+  "communities": {
+    "0": [
+      "components_mapcomponent_defaultcenter",
+      "components_mapcomponent_libraries",
+      "components_mapcomponent_mapcomponent",
+      "components_mapcomponent_mapcontainerstyle",
+      "components_mapcomponent_transit_colors",
+      "frontend_src_app_jsx",
+      "frontend_src_main_jsx",
+      "frontend_src_pages_homepage_jsx",
+      "frontend_src_pages_loginpage_jsx",
+      "frontend_src_utils_timeutils_js",
+      "pages_bookingpage_bookingpage",
+      "pages_homepage_homepage",
+      "pages_loginpage_loginpage",
+      "pages_mybookingspage_mybookingspage",
+      "pages_searchpage_searchpage",
+      "src_app_app",
+      "utils_timeutils_calculateduration",
+      "utils_timeutils_parsetimetominutes"
+    ],
+    "1": [
+      "backend_dependencies_py",
+      "backend_routes_booking_py",
+      "backend_routes_user_py",
+      "routes_booking_book",
+      "routes_booking_get_my_bookings",
+      "routes_booking_rationale_24",
+      "routes_booking_rationale_47",
+      "routes_user_get_current_user_info",
+      "routes_user_get_db",
+      "routes_user_login",
+      "routes_user_rationale_32",
+      "routes_user_rationale_52",
+      "routes_user_signup"
+    ],
+    "2": [
+      "backend_schemas_bookingcreate",
+      "backend_schemas_bookingresponse",
+      "backend_schemas_config",
+      "backend_schemas_loginrequest",
+      "backend_schemas_py",
+      "backend_schemas_routecreate",
+      "backend_schemas_routeresponse",
+      "backend_schemas_tokenresponse",
+      "backend_schemas_usercreate",
+      "backend_schemas_userresponse",
+      "basemodel"
+    ],
+    "3": [
+      "backend_crud_create_booking",
+      "backend_crud_create_route",
+      "backend_crud_create_user",
+      "backend_crud_get_routes",
+      "backend_crud_get_user_by_email",
+      "backend_crud_get_user_by_id",
+      "backend_crud_py",
+      "backend_routes_search_py",
+      "routes_search_rationale_19",
+      "routes_search_rationale_24",
+      "routes_search_search"
+    ],
+    "4": [
+      "backend_models_booking",
+      "backend_models_py",
+      "backend_models_route",
+      "backend_models_user",
+      "base"
+    ],
+    "5": [
+      "backend_auth_create_access_token",
+      "backend_auth_hash_password",
+      "backend_auth_py",
+      "backend_auth_verify_password"
+    ],
+    "6": [
+      "backend_seed_db_init_db",
+      "backend_seed_db_py",
+      "backend_seed_db_rationale_1",
+      "backend_seed_db_rationale_11"
+    ],
+    "7": [
+      "pages_preferencespage_notificationpreferences",
+      "pages_preferencespage_preferencespage",
+      "pages_preferencespage_transportoptions",
+      "pages_preferencespage_travelpreferences"
+    ],
+    "8": [
+      "pages_profilepage_profilepage",
+      "pages_profilepage_recapstats",
+      "pages_profilepage_shortcuts"
+    ],
+    "9": [
+      "pages_triphistorypage_filters",
+      "pages_triphistorypage_triphistorypage",
+      "pages_triphistorypage_trips"
+    ],
+    "10": [
+      "backend_database_load_dotenv",
+      "backend_database_py"
+    ],
+    "11": [
+      "backend_main_py",
+      "backend_main_root"
+    ],
+    "12": [
+      "backend_test_db_py",
+      "backend_test_db_test_connection"
+    ],
+    "13": [
+      "frontend_vite_config_js"
+    ]
+  },
+  "cohesion": {
+    "0": 0.19,
+    "1": 0.17,
+    "2": 0.31,
+    "3": 0.18,
+    "4": 0.6,
+    "5": 0.5,
+    "6": 0.5,
+    "7": 0.5,
+    "8": 0.67,
+    "9": 0.67,
+    "10": 1.0,
+    "11": 1.0,
+    "12": 1.0,
+    "13": 1.0
+  },
+  "gods": [
+    {
+      "id": "components_mapcomponent_mapcomponent",
+      "label": "MapComponent()",
+      "degree": 8
+    },
+    {
+      "id": "utils_timeutils_calculateduration",
+      "label": "calculateDuration()",
+      "degree": 7
+    },
+    {
+      "id": "routes_user_get_db",
+      "label": "get_db()",
+      "degree": 4
+    },
+    {
+      "id": "pages_bookingpage_bookingpage",
+      "label": "BookingPage()",
+      "degree": 4
+    },
+    {
+      "id": "pages_mybookingspage_mybookingspage",
+      "label": "MyBookingsPage()",
+      "degree": 4
+    },
+    {
+      "id": "pages_preferencespage_preferencespage",
+      "label": "PreferencesPage()",
+      "degree": 4
+    },
+    {
+      "id": "pages_searchpage_searchpage",
+      "label": "SearchPage()",
+      "degree": 4
+    },
+    {
+      "id": "backend_crud_get_routes",
+      "label": "get_routes()",
+      "degree": 3
+    },
+    {
+      "id": "routes_user_get_current_user_info",
+      "label": "get_current_user_info()",
+      "degree": 3
+    },
+    {
+      "id": "pages_profilepage_profilepage",
+      "label": "ProfilePage()",
+      "degree": 3
+    }
+  ],
+  "surprises": [
+    {
+      "source": "HomePage()",
+      "target": "calculateDuration()",
+      "source_files": [
+        "frontend/src/pages/HomePage.jsx",
+        "frontend/src/utils/timeUtils.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "peripheral node `HomePage()` unexpectedly reaches hub `calculateDuration()`"
+    },
+    {
+      "source": "get_routes()",
+      "target": "Get single route details by ID",
+      "source_files": [
+        "backend/crud.py",
+        "backend/routes/search.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "rationale_for",
+      "why": "cross-file semantic connection"
+    },
+    {
+      "source": "BookingPage()",
+      "target": "calculateDuration()",
+      "source_files": [
+        "frontend/src/pages/BookingPage.jsx",
+        "frontend/src/utils/timeUtils.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "cross-file semantic connection"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}
