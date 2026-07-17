@@ -7,7 +7,9 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import ProfilePage from './pages/ProfilePage';
 import PreferencesPage from './pages/PreferencesPage';
 import TripHistoryPage from './pages/TripHistoryPage';
+import AgenticPage from './pages/AgenticPage';
 import './index.css';
+
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -45,6 +47,7 @@ export default function App() {
             <button onClick={() => setCurrentPage('history')}>Trip History</button>
             <button onClick={() => setCurrentPage('profile')}>Profile</button>
             <button onClick={() => setCurrentPage('preferences')}>Preferences</button>
+            <button onClick={() => setCurrentPage('agentic')}>Agentic AI</button>
             <button onClick={handleLogout}>Logout</button>
           </nav>
         </header>
@@ -61,6 +64,7 @@ export default function App() {
         {currentPage === 'profile' && <ProfilePage onNavigate={setCurrentPage} />}
         {currentPage === 'preferences' && <PreferencesPage onNavigate={setCurrentPage} />}
         {currentPage === 'history' && <TripHistoryPage onNavigate={setCurrentPage} />}
+        {currentPage === 'agentic' && <AgenticPage />}
       </main>
     </div>
   );

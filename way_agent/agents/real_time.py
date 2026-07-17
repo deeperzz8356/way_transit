@@ -1,4 +1,10 @@
 from langchain_core.messages import AIMessage
+from prompts import build_agent_prompt
+from llm_client import get_llm
 
 def real_time_node(state: dict) -> dict:
-    return {"messages": [AIMessage(content="Real-Time Agent: I track live trains, buses, delays, and platform changes. What do you need to check?")]}
+    prompt = build_agent_prompt("Real-Time Transit Agent")
+    llm = get_llm()
+    chain = prompt | llm
+    response = chain.invoke(state)
+    return {"messages": [response]}

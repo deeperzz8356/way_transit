@@ -5,12 +5,10 @@ import warnings
 
 try:
     from dotenv import load_dotenv
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    load_dotenv(os.path.join(base_dir, ".env"))
 except Exception:
-    def load_dotenv():
-        return None
     warnings.warn("python-dotenv not installed; continuing without loading .env")
-
-load_dotenv()
 
 # Use environment variable or default to SQLite for MVP
 DATABASE_URL = os.getenv(

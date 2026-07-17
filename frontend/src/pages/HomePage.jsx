@@ -22,7 +22,7 @@ export default function HomePage({ onNavigate }) {
     <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} className="home-wrapper">
       {activeView === 'profile' && <ProfileView />}
       {activeView === 'home' && <HomeMainView onNavigate={onNavigate} />}
-      {activeView === 'ai' && <AIHelperView />}
+      {activeView === 'ai' && <AIHelperView onNavigate={onNavigate} />}
     </div>
   );
 }
@@ -228,7 +228,12 @@ function ProfileMenu() {
   );
 }
 
-function AIHelperView() {
+function AIHelperView({ onNavigate }) {
+  const [text, setText] = useState('');
+  const submit = (val) => {
+    window.initialAgenticMessage = val;
+    onNavigate('agentic');
+  };
   return (
     <section className="ai-helper-container">
       <div className="ai-header">
@@ -236,15 +241,15 @@ function AIHelperView() {
         <p>50°C | 19'Mar'26 | 11:36</p>
       </div>
       <div className="ai-bubbles">
-        <div className="ai-bubble plan-new">Plan a new<br/>Journey 💼 ↗</div>
-        <div className="ai-bubble plan-weekend">Plan Weekend<br/>Trek 💼 ↗</div>
-        <div className="ai-bubble start-group">Start a Group<br/>Chat 💬 ↗</div>
+        <div className="ai-bubble plan-new" onClick={() => submit('Plan a new journey')}>Plan a new<br/>Journey 💼 ↗</div>
+        <div className="ai-bubble plan-weekend" onClick={() => submit('Plan weekend trek')}>Plan Weekend<br/>Trek 💼 ↗</div>
+        <div className="ai-bubble start-group" onClick={() => submit('Start a group chat')}>Start a Group<br/>Chat 💬 ↗</div>
       </div>
-      <div className="ask-ai-bar">
+      <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) submit(text); }} className="ask-ai-bar">
         <span className="ai-icon">✨</span>
-        <input type="text" placeholder="Ask AI" />
+        <input type="text" placeholder="Ask AI" value={text} onChange={(e) => setText(e.target.value)} />
         <span className="mic-icon">🎤</span>
-      </div>
+      </form>
     </section>
   );
 }

@@ -1,4 +1,10 @@
 from langchain_core.messages import AIMessage
+from prompts import build_agent_prompt
+from llm_client import get_llm
 
 def tourist_node(state: dict) -> dict:
-    return {"messages": [AIMessage(content="Tourist Agent: I can help you find attractions, hotels, and plan your day. Where are we exploring?")]}
+    prompt = build_agent_prompt("Tourist Agent")
+    llm = get_llm()
+    chain = prompt | llm
+    response = chain.invoke(state)
+    return {"messages": [response]}

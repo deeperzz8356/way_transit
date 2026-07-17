@@ -1,13 +1,17 @@
 import sys
 import os
 
-# Add way_agent to the Python path so its internal imports (like `agents.supervisor`) work
+# Add way_agent to the Python path so its internal imports work
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../way_agent')))
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 from graph import app as graph_app
+from database import SessionLocal
+import models
+from dependencies import get_current_user
 
 router = APIRouter(
     prefix="/agent",
@@ -21,11 +25,59 @@ class ChatResponse(BaseModel):
     response: str
     agent: str
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat_with_agent(request: ChatRequest):
+def get_db():
+    db = SessionLocal()
     try:
-        # Initialize state
-        state = {"messages": [HumanMessage(content=request.message)]}
+        yield db
+    finally:
+        db.close()
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_with_agent(
+    request: ChatRequest,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Fetch User Data
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Fetch User's Bookings
+        bookings = db.query(models.Booking).filter(models.Booking.user_id == user_id).all()
+        booking_details = []
+        for b in bookings:
+            route = db.query(models.Route).filter(models.Route.id == b.route_id).first()
+            if route:
+                booking_details.append(f"Booking ID: {b.id}, Route: {route.source} to {route.destination} via {route.transport}, Status: {b.status}")
+        
+        # 3. Retrieve Context via RAG
+        from rag import retrieve_context
+        rag_context = retrieve_context(request.message)
+        
+        # Construct db_context string
+        bookings_context = "\n".join(booking_details) if booking_details else "No current bookings."
+        
+        db_context = f"""
+--- DATABASE CONTEXT ---
+CURRENT USER:
+Email: {user.email}
+User ID: {user.id}
+
+USER'S CURRENT BOOKINGS:
+{bookings_context}
+
+RELEVANT TRANSIT KNOWLEDGE & ROUTES:
+{rag_context}
+------------------------
+"""
+
+        # Initialize state with db_context
+        state = {
+            "messages": [HumanMessage(content=request.message)],
+            "db_context": db_context
+        }
         
         # Run graph
         result = graph_app.invoke(state)

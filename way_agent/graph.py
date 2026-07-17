@@ -15,6 +15,8 @@ from agents.qa_agent import qa_node
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     next: str
+    db_context: str
+
 
 # Build the Graph
 workflow = StateGraph(AgentState)

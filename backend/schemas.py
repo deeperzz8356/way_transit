@@ -36,6 +36,12 @@ class RouteResponse(BaseModel):
 class BookingCreate(BaseModel):
     route_id: int
 
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    response: str
+
 class BookingCreateOrder(BaseModel):
     route_id: int
     source: str
@@ -74,3 +80,15 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
+class MapStopResponse(BaseModel):
+    id: int
+    name: str
+    lat: float
+    lon: float
+    mode: str
+    sequence: int
+
+class MapRoutePathResponse(BaseModel):
+    route_id: int
+    mode: str
+    stops: list[MapStopResponse]

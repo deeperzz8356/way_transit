@@ -17,10 +17,24 @@ def get_user_by_id(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
 def get_routes(db: Session, source: str, destination: str):
-    return db.query(models.Route).filter(
-        models.Route.source == source,
-        models.Route.destination == destination
-    ).all()
+    from sqlalchemy import text
+    query = text("""
+        SELECT DISTINCT r.id
+        FROM routes r
+        JOIN trips t ON t.route_id = r.id
+        JOIN stop_times st_start ON st_start.trip_id = t.id
+        JOIN stops s_start ON st_start.stop_id = s_start.id
+        JOIN stop_times st_end ON st_end.trip_id = t.id
+        JOIN stops s_end ON st_end.stop_id = s_end.id
+        WHERE st_start.stop_sequence < st_end.stop_sequence
+          AND (lower(s_start.name) LIKE lower(:source) OR lower(s_start.stop_code) = lower(:source))
+          AND (lower(s_end.name) LIKE lower(:destination) OR lower(s_end.stop_code) = lower(:destination))
+    """)
+    route_ids = [row[0] for row in db.execute(query, {
+        "source": f"%{source}%",
+        "destination": f"%{destination}%"
+    }).all()]
+    return db.query(models.Route).filter(models.Route.id.in_(route_ids)).all()
 
 def create_booking(db: Session, user_id: int, route_id: int):
     booking = models.Booking(

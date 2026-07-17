@@ -1,4 +1,10 @@
 from langchain_core.messages import AIMessage
+from prompts import build_agent_prompt
+from llm_client import get_llm
 
 def safety_node(state: dict) -> dict:
-    return {"messages": [AIMessage(content="Safety Agent: I monitor crowd density and provide safe, accessible routes.")]}
+    prompt = build_agent_prompt("Safety Agent")
+    llm = get_llm()
+    chain = prompt | llm
+    response = chain.invoke(state)
+    return {"messages": [response]}

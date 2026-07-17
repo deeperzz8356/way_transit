@@ -232,3 +232,20 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   cursor: pointer;
 }
+
+.ep-name-input {
+  font-size: 14px;
+  color: #333;
+  max-width: 120px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 4px;
+  margin-top: 4px;
+  background: transparent;
+}
+.ep-name-input:focus {
+  outline: none;
+  border-color: #8b9dff;
+  background: white;
+}
