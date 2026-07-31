@@ -85,6 +85,10 @@ class Route(Base):
         if self.trips and self.trips[0].stop_times:
             sorted_stops = sorted(self.trips[0].stop_times, key=lambda x: x.stop_sequence)
             return sorted_stops[0].stop.name
+        if self.name and " to " in self.name.lower():
+            parts = self.name.split(" to ", 1)
+            if len(parts) == 2 and parts[0].strip():
+                return parts[0].strip()
         return "Unknown"
 
     @property
@@ -92,6 +96,10 @@ class Route(Base):
         if self.trips and self.trips[0].stop_times:
             sorted_stops = sorted(self.trips[0].stop_times, key=lambda x: x.stop_sequence)
             return sorted_stops[-1].stop.name
+        if self.name and " to " in self.name.lower():
+            parts = self.name.split(" to ", 1)
+            if len(parts) == 2 and parts[1].strip():
+                return parts[1].strip()
         return "Unknown"
 
     @property
@@ -249,13 +257,11 @@ class Booking(Base):
     from_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     to_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     trip_id = Column(Integer, ForeignKey("trips.id"), index=True)
-    fare = Column(Float)
     distance_km = Column(Float)
-    payment_status = Column(String)
-    payment_method = Column(String)
-    razorpay_order_id = Column(String)
-    razorpay_payment_id = Column(String)
+    image_url = Column(String, nullable=True)
     ticket_code = Column(String, unique=True, index=True)
+    source = Column(String, nullable=True)
+    destination = Column(String, nullable=True)
     travel_date = Column(Date)
     status = Column(String, default="CONFIRMED")
     booked_at = Column(DateTime, default=datetime.utcnow)
@@ -266,6 +272,23 @@ class Booking(Base):
     arrival_stop = relationship("Stop", foreign_keys=[to_stop_id], back_populates="arrival_bookings")
     trip = relationship("Trip", back_populates="bookings")
     reward_points = relationship("RewardPoint", back_populates="booking")
+
+
+class TicketIngestJob(Base):
+    __tablename__ = "ticket_ingest_jobs"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    image_url = Column(String, nullable=False)
+    status = Column(String, default="uploaded")  # uploaded|processing|extracted|confirmed|error
+    source = Column(String, nullable=True)
+    destination = Column(String, nullable=True)
+    operator = Column(String, nullable=True)
+    travel_date = Column(String, nullable=True)
+    raw_text = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Journey(Base):
     __tablename__ = "journeys"

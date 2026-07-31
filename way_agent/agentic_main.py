@@ -32,7 +32,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
         "messages": [HumanMessage(content=request.message)],
         "next": "Supervisor",
     }
-    result = graph_app.invoke(state)
+    thread_id = request.session_id or f"user_{request.user_id or 'default'}"
+    config = {"configurable": {"thread_id": thread_id}}
+    result = graph_app.invoke(state, config=config)
     messages = result.get("messages", [])
     response = messages[-1].content if messages else "No response generated."
 

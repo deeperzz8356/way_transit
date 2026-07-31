@@ -1,0 +1,103 @@
+.wallet-page {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.wallet-header {
+    margin-bottom: 2rem;
+}
+
+.wallet-header h1 {
+    font-size: 2.5rem;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.ticket-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.ticket-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 5px solid #3498db;
+    transition: transform 0.2s ease;
+}
+
+.ticket-card:hover {
+    transform: translateY(-5px);
+}
+
+.ticket-info {
+    flex: 1;
+}
+
+.ticket-info h3 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+}
+
+.ticket-info .status {
+    color: #27ae60;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.ticket-info .date {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.scanned-thumbnail {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-top: 1rem;
+    border: 1px solid #bdc3c7;
+}
+
+.qr-section {
+    text-align: center;
+    margin-left: 1rem;
+    padding-left: 1rem;
+    border-left: 1px dashed #bdc3c7;
+}
+
+.qr-code {
+    width: 100px;
+    height: 100px;
+}
+
+.ticket-code {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    margin-top: 0.5rem;
+}
+
+.empty-wallet {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    color: #7f8c8d;
+    font-size: 1.2rem;
+}
+
+.error-message {
+    background: #fee;
+    color: #c0392b;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}

@@ -47,17 +47,27 @@ def create_booking(db: Session, user_id: int, route_id: int):
     db.refresh(booking)
     return booking
 
-def create_booking_order(db: Session, user_id: int, route_id: int, source: str, destination: str, distance_km: float, fare: float, payment_order_id: str):
+import uuid
+
+def create_unified_ticket(db: Session, user_id: int, source: str, destination: str, image_url: str = None):
+    """Create a wallet ticket linked to a lightweight route so source/destination persist."""
+    route = models.Route(
+        name=f"{source} to {destination}",
+        mode="transit",
+        is_active=True,
+    )
+    db.add(route)
+    db.flush()
+
+    ticket_code = str(uuid.uuid4())
     booking = models.Booking(
         user_id=user_id,
-        route_id=route_id,
-        status="PENDING",
-        payment_status="pending",
-        payment_order_id=payment_order_id,
-        fare=fare,
+        route_id=route.id,
+        status="CONFIRMED",
+        ticket_code=ticket_code,
+        image_url=image_url,
         source=source,
         destination=destination,
-        distance_km=distance_km
     )
     db.add(booking)
     db.commit()
@@ -66,14 +76,39 @@ def create_booking_order(db: Session, user_id: int, route_id: int, source: str, 
 
 def create_route(db: Session, source: str, destination: str, transport: str, departure_time: str, arrival_time: str, price: int):
     route = models.Route(
-        source=source,
-        destination=destination,
-        transport=transport,
-        departure_time=departure_time,
-        arrival_time=arrival_time,
-        price=price
+        name=f"{source} to {destination}",
+        mode=transport
     )
     db.add(route)
     db.commit()
     db.refresh(route)
     return route
+
+
+def create_ticket_ingest_job(db: Session, user_id: int, image_url: str):
+    job = models.TicketIngestJob(
+        user_id=user_id,
+        image_url=image_url,
+        status="uploaded",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def get_ticket_ingest_job(db: Session, job_id: int, user_id: int = None):
+    q = db.query(models.TicketIngestJob).filter(models.TicketIngestJob.id == job_id)
+    if user_id is not None:
+        q = q.filter(models.TicketIngestJob.user_id == user_id)
+    return q.first()
+
+
+def update_ticket_ingest_job(db: Session, job: models.TicketIngestJob, **fields):
+    for key, value in fields.items():
+        if hasattr(job, key):
+            setattr(job, key, value)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job

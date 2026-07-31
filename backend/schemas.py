@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, model_validator
+from typing import Optional, Any
 from datetime import datetime
 
 class UserCreate(BaseModel):
@@ -33,8 +33,16 @@ class RouteResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class BookingCreate(BaseModel):
-    route_id: int
+class TicketAddRequest(BaseModel):
+    source: str
+    destination: str
+    image_url: Optional[str] = None
+
+class TicketConfirmRequest(BaseModel):
+    source: str
+    destination: str
+    operator: Optional[str] = None
+    travel_date: Optional[str] = None
 
 class ChatRequest(BaseModel):
     message: str
@@ -42,36 +50,69 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
-class BookingCreateOrder(BaseModel):
-    route_id: int
-    source: str
-    destination: str
-    distance_km: float
-
-class PaymentVerify(BaseModel):
-    razorpay_order_id: str
-    razorpay_payment_id: str
-    razorpay_signature: str
-    booking_id: int
-
 class BookingResponse(BaseModel):
     id: int
     user_id: int
-    route_id: int
+    route_id: Optional[int] = None
     status: str
-    created_at: datetime
-    payment_status: Optional[str] = None
-    payment_order_id: Optional[str] = None
-    payment_id: Optional[str] = None
-    fare: Optional[float] = None
-    source: Optional[str] = None
-    destination: Optional[str] = None
+    image_url: Optional[str] = None
+    ticket_code: Optional[str] = None
     distance_km: Optional[float] = None
     booked_at: Optional[datetime] = None
+    source: Optional[str] = None
+    destination: Optional[str] = None
     route: Optional[RouteResponse] = None
     
     class Config:
         from_attributes = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_source_destination(cls, data: Any):
+        if isinstance(data, dict):
+            return data
+        source = getattr(data, "source", None)
+        destination = getattr(data, "destination", None)
+        route = getattr(data, "route", None)
+        if not source and route is not None:
+            source = getattr(route, "source", None)
+        if not destination and route is not None:
+            destination = getattr(route, "destination", None)
+        return {
+            "id": data.id,
+            "user_id": data.user_id,
+            "route_id": data.route_id,
+            "status": data.status,
+            "image_url": data.image_url,
+            "ticket_code": data.ticket_code,
+            "distance_km": data.distance_km,
+            "booked_at": data.booked_at,
+            "source": source,
+            "destination": destination,
+            "route": route,
+        }
+
+class TicketJobResponse(BaseModel):
+    id: int
+    status: str
+    image_url: str
+    source: Optional[str] = None
+    destination: Optional[str] = None
+    operator: Optional[str] = None
+    travel_date: Optional[str] = None
+    raw_text: Optional[str] = None
+    error_message: Optional[str] = None
+    booking_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class TicketUploadResponse(BaseModel):
+    job_id: int
+    status: str
+    image_url: str
+    events_url: str
 
 class LoginRequest(BaseModel):
     email: str
@@ -80,6 +121,7 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
+
 class MapStopResponse(BaseModel):
     id: int
     name: str

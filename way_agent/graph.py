@@ -56,6 +56,8 @@ workflow.add_conditional_edges(
         "FINISH": END
     }
 )
+from memory.state_memory import get_checkpointer
+
 workflow.set_entry_point("Supervisor")
 
-app = workflow.compile()
+app = workflow.compile(checkpointer=get_checkpointer())

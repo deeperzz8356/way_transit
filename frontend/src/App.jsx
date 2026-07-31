@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
-import BookingPage from './pages/BookingPage';
-import MyBookingsPage from './pages/MyBookingsPage';
+import AddTicketPage from './pages/AddTicketPage';
+import WalletPage from './pages/WalletPage';
 import ProfilePage from './pages/ProfilePage';
 import PreferencesPage from './pages/PreferencesPage';
 import TripHistoryPage from './pages/TripHistoryPage';
 import AgenticPage from './pages/AgenticPage';
+import Dashboard from './pages/dashboard/Dashboard';
 import './index.css';
+import MapComponent from './components/MapComponent';
 
 
 export default function App() {
@@ -42,29 +44,33 @@ export default function App() {
             <img src="/Group 1485.png" alt="WAY Logo" style={{ height: '32px' }} /> Transit
           </h1>
           <nav>
-            <button onClick={() => setCurrentPage('search')}>Search</button>
-            <button onClick={() => setCurrentPage('bookings')}>My Bookings</button>
+            <button onClick={() => setCurrentPage('add-ticket')}>Add Ticket</button>
+            <button onClick={() => setCurrentPage('wallet')}>Unified Wallet</button>
             <button onClick={() => setCurrentPage('history')}>Trip History</button>
             <button onClick={() => setCurrentPage('profile')}>Profile</button>
             <button onClick={() => setCurrentPage('preferences')}>Preferences</button>
             <button onClick={() => setCurrentPage('agentic')}>Agentic AI</button>
+            <button onClick={() => setCurrentPage('dashboard')}>Dashboard</button>
             <button onClick={handleLogout}>Logout</button>
           </nav>
         </header>
       )}
 
       <main className="container">
+        {/* Global map preview on main page */}
+
         {currentPage === 'home' && <HomePage token={token} onNavigate={setCurrentPage} onLogout={handleLogout} />}
         {currentPage === 'search' && <SearchPage token={token} onBook={(routeId) => {
           window.routeToBook = routeId;
-          setCurrentPage('book');
+          setCurrentPage('add-ticket');
         }} />}
-        {currentPage === 'book' && <BookingPage token={token} routeId={window.routeToBook} onSuccess={() => setCurrentPage('home')} onCancel={() => setCurrentPage('search')} />}
-        {currentPage === 'bookings' && <MyBookingsPage token={token} />}
+        {currentPage === 'add-ticket' && <AddTicketPage token={token} onNavigate={setCurrentPage} />}
+        {currentPage === 'wallet' && <WalletPage token={token} />}
         {currentPage === 'profile' && <ProfilePage onNavigate={setCurrentPage} />}
         {currentPage === 'preferences' && <PreferencesPage onNavigate={setCurrentPage} />}
         {currentPage === 'history' && <TripHistoryPage onNavigate={setCurrentPage} />}
         {currentPage === 'agentic' && <AgenticPage />}
+        {currentPage === 'dashboard' && <Dashboard />}
       </main>
     </div>
   );
