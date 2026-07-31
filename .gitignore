@@ -10,7 +10,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/  # Commented out to allow Flutter lib directory
 lib64/
 parts/
 sdist/
@@ -43,6 +43,9 @@ env/
 *.sqlite3
 way_transit.db
 
+# Uploaded ticket images
+backend/uploads/
+
 # Node
 node_modules/
 dist/
@@ -65,3 +68,6 @@ Thumbs.db
 start.bat
 start.sh
 data
+
+way_mobile
+way_os
