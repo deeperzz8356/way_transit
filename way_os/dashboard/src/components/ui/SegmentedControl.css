@@ -1,0 +1,49 @@
+.seg {
+  display: inline-flex;
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+
+.seg__btn {
+  position: relative;
+  padding: 7px 14px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease-out);
+  z-index: 1;
+}
+
+.seg__btn:hover {
+  color: var(--text);
+}
+
+.seg__btn.is-active {
+  color: var(--text);
+}
+
+.seg__pill {
+  position: absolute;
+  inset: 0;
+  background: var(--elevated-2);
+  border-radius: 4px;
+  border: 1px solid var(--hairline-strong);
+  z-index: -1;
+}
+
+.seg__label {
+  position: relative;
+  z-index: 1;
+}
+
+.seg--sm .seg__btn {
+  padding: 5px 10px;
+  font-size: 10px;
+}

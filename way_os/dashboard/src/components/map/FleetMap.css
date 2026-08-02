@@ -1,0 +1,96 @@
+.fleet-map {
+  position: absolute;
+  inset: 0;
+}
+
+.fleet-map__stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.fleet-map__leaflet {
+  width: 100%;
+  height: 100%;
+}
+
+.fleet-map__mode {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 530;
+  padding: 4px;
+  border-radius: var(--radius);
+}
+
+.fleet-map__mode--ops {
+  left: auto;
+  right: 18px;
+  transform: none;
+}
+
+.fleet-map__mode .seg {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.fleet-map__legend {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  right: auto;
+  z-index: 520;
+  display: flex;
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.fleet-map__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fleet-map__legend .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot--bus { background: var(--mode-bus); }
+.dot--mini { background: var(--mode-mini); }
+.dot--taxi { background: var(--mode-taxi); }
+.dot--auto { background: var(--mode-auto); }
+
+.vehicle-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+@media (max-width: 768px) {
+  .fleet-map__mode,
+  .fleet-map__mode--ops {
+    top: 10px;
+    left: 12px;
+    right: auto;
+    transform: none;
+  }
+
+  .fleet-map__legend {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    justify-content: space-between;
+  }
+}

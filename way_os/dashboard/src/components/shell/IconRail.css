@@ -1,0 +1,107 @@
+.icon-rail {
+  width: var(--rail-width);
+  background: linear-gradient(180deg, #10131a 0%, var(--panel) 40%);
+  border-right: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 0;
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.icon-rail__brand {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.04em;
+  color: var(--teal);
+  margin-bottom: 22px;
+  background: var(--teal-dim);
+}
+
+.icon-rail__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 0 8px;
+}
+
+.icon-rail__btn {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.icon-rail__btn:hover {
+  color: var(--text);
+}
+
+.icon-rail__btn.is-active {
+  color: var(--teal);
+}
+
+.icon-rail__indicator {
+  position: absolute;
+  inset: 0;
+  background: var(--teal-dim);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(46, 196, 182, 0.22);
+  z-index: -1;
+}
+
+.icon-rail__label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+  .icon-rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    height: 64px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--hairline);
+    padding: 0;
+    z-index: 30;
+    background: rgba(18, 21, 27, 0.96);
+    backdrop-filter: blur(12px);
+  }
+
+  .icon-rail__brand {
+    display: none;
+  }
+
+  .icon-rail__list {
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  .icon-rail__btn {
+    padding: 8px;
+  }
+}

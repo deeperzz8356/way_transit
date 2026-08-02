@@ -1,0 +1,97 @@
+.top-bar {
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  background: rgba(12, 14, 18, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--hairline);
+  z-index: 15;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.top-bar__left,
+.top-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.top-bar__brand {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.top-bar__brand span {
+  color: var(--teal);
+}
+
+.top-bar__divider {
+  width: 1px;
+  height: 18px;
+  background: var(--hairline-strong);
+}
+
+.top-bar__city {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.top-bar__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.top-bar__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+}
+
+.top-bar__clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .top-bar {
+    background: var(--bg);
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-bar {
+    padding: 0 12px;
+  }
+
+  .top-bar__live,
+  .top-bar__divider {
+    display: none;
+  }
+
+  .top-bar__clock {
+    display: none;
+  }
+}

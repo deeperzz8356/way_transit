@@ -1,30 +1,37 @@
-"""Ticket image OCR + field extraction for unified wallet ingest."""
+"""Ticket image OCR + field extraction for unified wallet ingest.
+
+Engine order:
+  1. Groq vision LLM (primary)
+  2. Google Cloud Vision (fallback)
+  3. Tesseract (offline last resort)
+"""
 from __future__ import annotations
 
 import os
 import re
 from typing import Optional
 
+try:
+    from dotenv import load_dotenv
 
-def _ocr_with_tesseract(image_path: str) -> Optional[str]:
-    try:
-        import pytesseract
-        from PIL import Image
-    except ImportError:
-        return None
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    load_dotenv(os.path.join(_root, ".env"))
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except Exception:
+    pass
 
-    try:
-        image = Image.open(image_path)
-        text = pytesseract.image_to_string(image)
-        return text.strip() if text and text.strip() else None
-    except Exception:
-        return None
+_LAST_GROQ_ERROR: Optional[str] = None
+_LAST_GOOGLE_ERROR: Optional[str] = None
+_LAST_TESSERACT_ERROR: Optional[str] = None
 
 
 def _ocr_with_groq_vision(image_path: str) -> Optional[str]:
-    """Optional vision pass when GROQ_API_KEY is set."""
+    """Primary: vision LLM when GROQ_API_KEY is set."""
+    global _LAST_GROQ_ERROR
+    _LAST_GROQ_ERROR = None
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
+        _LAST_GROQ_ERROR = "GROQ_API_KEY missing in .env"
         return None
     try:
         import base64
@@ -35,9 +42,10 @@ def _ocr_with_groq_vision(image_path: str) -> Optional[str]:
         ext = os.path.splitext(image_path)[1].lower().lstrip(".") or "jpeg"
         mime = "image/png" if ext == "png" else "image/jpeg"
 
+        model = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
         client = Groq(api_key=api_key)
         completion = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            model=model,
             messages=[
                 {
                     "role": "user",
@@ -45,9 +53,15 @@ def _ocr_with_groq_vision(image_path: str) -> Optional[str]:
                         {
                             "type": "text",
                             "text": (
-                                "Extract transit ticket text. Prefer lines with From/To, "
-                                "Source/Destination, Origin/Destination, stations, operator, date. "
-                                "Return plain text only."
+                                "Read the transit ticket in the image carefully. "
+                                "Extract the real origin and destination station names printed on it. "
+                                "Output ONLY these lines, using the real values from the image. "
+                                "If a value is not visible, omit that line entirely. "
+                                "Do NOT output angle brackets, placeholders, or the words station/name/date alone.\n"
+                                "From: \n"
+                                "To: \n"
+                                "Operator: \n"
+                                "Date: "
                             ),
                         },
                         {
@@ -58,20 +72,158 @@ def _ocr_with_groq_vision(image_path: str) -> Optional[str]:
                 }
             ],
             temperature=0,
-            max_tokens=500,
+            max_tokens=800,
         )
         text = completion.choices[0].message.content
-        return text.strip() if text else None
-    except Exception:
+        if not text:
+            _LAST_GROQ_ERROR = "Groq returned empty content"
+            return None
+        # Qwen-style models may wrap reasoning in <think>...</think>
+        text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
+        return text if text else None
+    except Exception as exc:
+        _LAST_GROQ_ERROR = str(exc)
         return None
+
+
+def _ocr_with_google_vision(image_path: str) -> Optional[str]:
+    """Fallback: Google Cloud Vision OCR (API key or ADC service account)."""
+    global _LAST_GOOGLE_ERROR
+    _LAST_GOOGLE_ERROR = None
+    api_key = (
+        os.getenv("GOOGLE_VISION_API_KEY")
+        or os.getenv("GOOGLE_CLOUD_VISION_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+    )
+
+    # Prefer REST + API key (no extra SDK required)
+    if api_key:
+        try:
+            import base64
+            import json
+            import urllib.request
+
+            with open(image_path, "rb") as f:
+                content = base64.b64encode(f.read()).decode("utf-8")
+
+            body = json.dumps(
+                {
+                    "requests": [
+                        {
+                            "image": {"content": content},
+                            "features": [{"type": "DOCUMENT_TEXT_DETECTION"}],
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+            url = (
+                "https://vision.googleapis.com/v1/images:annotate"
+                f"?key={api_key}"
+            )
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+
+            responses = payload.get("responses") or []
+            if not responses:
+                return None
+            first = responses[0]
+            if first.get("error"):
+                _LAST_GOOGLE_ERROR = str(first.get("error"))
+                return None
+            full = first.get("fullTextAnnotation") or {}
+            text = full.get("text")
+            if text and text.strip():
+                return text.strip()
+            annotations = first.get("textAnnotations") or []
+            if annotations and annotations[0].get("description"):
+                return annotations[0]["description"].strip()
+            return None
+        except Exception as exc:
+            _LAST_GOOGLE_ERROR = str(exc)
+            return None
+
+    # Optional: google-cloud-vision with Application Default Credentials
+    try:
+        from google.cloud import vision  # type: ignore
+
+        client = vision.ImageAnnotatorClient()
+        with open(image_path, "rb") as f:
+            content = f.read()
+        image = vision.Image(content=content)
+        response = client.document_text_detection(image=image)
+        if response.error.message:
+            _LAST_GOOGLE_ERROR = response.error.message
+            return None
+        text = response.full_text_annotation.text if response.full_text_annotation else None
+        return text.strip() if text and text.strip() else None
+    except Exception as exc:
+        _LAST_GOOGLE_ERROR = str(exc)
+        return None
+
+
+def _ocr_with_tesseract(image_path: str) -> Optional[str]:
+    """Last resort: local Tesseract when installed."""
+    global _LAST_TESSERACT_ERROR
+    _LAST_TESSERACT_ERROR = None
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        _LAST_TESSERACT_ERROR = "pytesseract not installed"
+        return None
+
+    try:
+        image = Image.open(image_path)
+        text = pytesseract.image_to_string(image)
+        return text.strip() if text and text.strip() else None
+    except Exception as exc:
+        _LAST_TESSERACT_ERROR = str(exc)
+        return None
+
+
+def _clean_field(value: Optional[str]) -> Optional[str]:
+    """Drop empty values and LLM prompt placeholders."""
+    if value is None:
+        return None
+    cleaned = value.strip().strip("\"'`")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return None
+    lowered = cleaned.lower()
+    # Reject angle-bracket placeholders and obvious template tokens
+    if re.fullmatch(r"<[^>]+>", cleaned) or (cleaned.startswith("<") and cleaned.endswith(">")):
+        return None
+    if lowered in {
+        "<station>",
+        "station",
+        "<name>",
+        "name",
+        "<date>",
+        "date",
+        "station_name",
+        "n/a",
+        "na",
+        "none",
+        "null",
+        "...",
+        "unknown",
+    }:
+        return None
+    return cleaned
 
 
 def _first_match(patterns: list[str], text: str) -> Optional[str]:
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE | re.MULTILINE)
         if match:
-            value = match.group(1).strip(" :-|\t")
-            value = re.sub(r"\s+", " ", value).strip()
+            value = _clean_field(match.group(1).strip(" :-|\t"))
             if value:
                 return value
     return None
@@ -120,32 +272,51 @@ def parse_ticket_text(text: str) -> dict:
                 flags=re.IGNORECASE,
             )
             if m:
-                source = source or m.group(1).strip()
-                destination = destination or m.group(2).strip()
+                source = source or _clean_field(m.group(1))
+                destination = destination or _clean_field(m.group(2))
                 break
 
     return {
-        "source": source,
-        "destination": destination,
-        "operator": operator,
-        "travel_date": travel_date,
+        "source": _clean_field(source),
+        "destination": _clean_field(destination),
+        "operator": _clean_field(operator),
+        "travel_date": _clean_field(travel_date),
         "raw_text": cleaned[:4000] if cleaned else None,
     }
 
 
 def extract_ticket_info(image_path: str) -> dict:
     """
-    Run OCR/vision then parse fields.
+    Run vision/OCR then parse fields.
+    Order: Groq vision → Google Cloud Vision → Tesseract.
     Always returns a dict; missing fields are None so the client can edit.
     """
-    text = _ocr_with_tesseract(image_path)
-    engine = "tesseract" if text else None
+    text = None
+    engine = None
+
+    text = _ocr_with_groq_vision(image_path)
+    if text:
+        engine = "groq_vision"
+    else:
+        text = _ocr_with_google_vision(image_path)
+        if text:
+            engine = "google_vision"
+        else:
+            text = _ocr_with_tesseract(image_path)
+            if text:
+                engine = "tesseract"
 
     if not text:
-        text = _ocr_with_groq_vision(image_path)
-        engine = "groq_vision" if text else None
-
-    if not text:
+        details = []
+        if _LAST_GROQ_ERROR:
+            details.append(f"Groq: {_LAST_GROQ_ERROR}")
+        elif not os.getenv("GROQ_API_KEY"):
+            details.append("Groq: GROQ_API_KEY missing in F:/way_transit/.env")
+        if _LAST_GOOGLE_ERROR:
+            details.append(f"Google Vision: {_LAST_GOOGLE_ERROR}")
+        if _LAST_TESSERACT_ERROR:
+            details.append(f"Tesseract: {_LAST_TESSERACT_ERROR}")
+        hint = "; ".join(details) if details else "no engines available"
         return {
             "source": None,
             "destination": None,
@@ -153,10 +324,10 @@ def extract_ticket_info(image_path: str) -> dict:
             "travel_date": None,
             "raw_text": None,
             "ocr_engine": None,
-            "message": "No OCR engine available or no text found; enter stations manually.",
+            "message": f"OCR failed ({hint}). Enter stations manually.",
         }
 
     parsed = parse_ticket_text(text)
     parsed["ocr_engine"] = engine
-    parsed["message"] = "Fields extracted; review before saving."
+    parsed["message"] = f"Fields extracted via {engine}; review before saving."
     return parsed

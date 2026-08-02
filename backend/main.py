@@ -1,4 +1,12 @@
 from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+
+# Load repo-root .env before anything else (OCR / Groq)
+_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_ROOT / ".env")
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,11 +36,11 @@ ensure_ticket_schema()
 
 app = FastAPI(title="WAY Transit API", version="1.0.0", lifespan=lifespan)
 
-# CORS middleware to allow frontend communication
+# CORS: allow Flutter web (random localhost ports) + Vite
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:*"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
