@@ -37,6 +37,7 @@ dependencies:
   
   # HTTP and API
   http: ^1.2.0
+  http_parser: ^4.0.0
   
   # Local storage
   shared_preferences: ^2.2.2
@@ -54,6 +55,12 @@ dependencies:
   # Unified Ticketing
   qr_flutter: ^4.1.0
   image_picker: ^1.0.7
+  
+  # Firebase authentication and social login
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.7.0
+  firebase_auth_platform_interface: ^7.7.3
+  google_sign_in: ^6.1.0
 
 dev_dependencies:
   flutter_test:

@@ -45,7 +45,7 @@ function HomeHeader({ onNavigate }) {
     <div className="home-header-new">
       <div className="home-greeting">
         <span className="wave">👋</span>
-        <span className="greeting-text">HelloDaniel!</span>
+        <span className="greeting-text">Hello!</span>
       </div>
       <div className="home-header-icons">
         <button className="icon-btn-round">📅</button>

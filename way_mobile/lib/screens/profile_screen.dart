@@ -1,36 +1,181 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../models/user.dart';
+import 'login_flow.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildProfileHeader(),
-              const SizedBox(height: 24),
-              _buildProfileCards(),
-              const SizedBox(height: 24),
-              _buildStudentPass(),
-              const SizedBox(height: 24),
-              _buildTravelDiary(),
-              const SizedBox(height: 24),
-              _buildProfileStats(),
-              const SizedBox(height: 24),
-              _buildBottomActions(),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final ApiService _apiService = ApiService();
+  late final AuthService _authService;
+  late Future<User> _userFuture;
+  final TextEditingController _nameController = TextEditingController();
+  bool _isSaving = false;
+  String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = AuthService(_apiService);
+    _userFuture = _loadUser();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<User> _loadUser() async {
+    final user = await _authService.getCurrentUser();
+    _nameController.text = user.name ?? '';
+    return user;
+  }
+
+  void _refreshUser() {
+    setState(() {
+      _userFuture = _loadUser();
+      _statusMessage = null;
+    });
+  }
+
+  Future<void> _saveName() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _statusMessage = 'Please enter your name.');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _statusMessage = null;
+    });
+
+    try {
+      await _authService.updateProfileName(name);
+      _refreshUser();
+      setState(() => _statusMessage = 'Profile updated successfully.');
+    } catch (e) {
+      setState(() => _statusMessage = 'Failed to update profile: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    await _authService.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginFlow()),
+      (route) => false,
     );
   }
 
-  Widget _buildProfileHeader() {
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete account'),
+          content: const Text('This will permanently delete your account. Continue?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _authService.deleteAccount();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginFlow()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete account: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<User>(
+      future: _userFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF8F9FE),
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8F9FE),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Unable to load profile.', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    Text(snapshot.error.toString(), textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    ElevatedButton(onPressed: _refreshUser, child: const Text('Retry')),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        final user = snapshot.data!;
+        final title = user.name ?? user.email ?? user.phone ?? 'WAY Rider';
+        final subtitle = user.email ?? user.phone ?? 'Traveler';
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8F9FE),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildProfileHeader(title, subtitle, user),
+                  const SizedBox(height: 24),
+                  _buildProfileCards(),
+                  const SizedBox(height: 24),
+                  _buildEditSection(user),
+                  const SizedBox(height: 16),
+                  if (_statusMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      child: Text(_statusMessage!, style: const TextStyle(color: Color(0xFF5974FF))),
+                    ),
+                  const SizedBox(height: 24),
+                  _buildBottomActions(),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileHeader(String title, String subtitle, User user) {
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
@@ -43,13 +188,13 @@ class ProfileScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(40),
             ),
             child: const Center(
-              child: Text('👩‍🎨', style: TextStyle(fontSize: 40)),
+              child: Text('👤', style: TextStyle(fontSize: 40)),
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Daniel Smith',
-            style: TextStyle(
+          Text(
+            title,
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Color(0xFF1A1B35),
@@ -57,10 +202,18 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '📍 Navi Mumbai | 32 Trips',
+            subtitle,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Provider: ${user.authProvider ?? 'local'}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
             ),
           ),
         ],
@@ -73,17 +226,11 @@ class ProfileScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Row(
         children: [
-          Expanded(
-            child: _buildQuickCard('Documents ↗'),
-          ),
+          Expanded(child: _buildQuickCard('Documents ↗')),
           const SizedBox(width: 12),
-          Expanded(
-            child: _buildQuickCard('Help ↗'),
-          ),
+          Expanded(child: _buildQuickCard('Help ↗')),
           const SizedBox(width: 12),
-          Expanded(
-            child: _buildQuickCard('FAQ ↗'),
-          ),
+          Expanded(child: _buildQuickCard('FAQ ↗')),
         ],
       ),
     );
@@ -97,7 +244,7 @@ class ProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -116,323 +263,60 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStudentPass() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF5974FF), Color(0xFF3D5BD9)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF5974FF).withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        '12S Churchgate',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'II Class',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'P3 Platform',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Column(
-                  children: [
-                    const Text(
-                      'CHS',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'QR',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF5974FF),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  children: [
-                    const Text(
-                      'BA',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Student Pass\n02/07/2026 - 05/07/2026',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTravelDiary() {
+  Widget _buildEditSection(User user) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Your travel diary 📓',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1B35),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Relive your journeys - places you\'ve been...',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'View All',
-                  style: TextStyle(
-                    color: Color(0xFF5974FF),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+          const Text('Edit Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35))),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: 'Name',
+              filled: true,
+              fillColor: const Color(0xFFF4F6FB),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionBox('Booking History ↗'),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionBox('Goals & Rewards ↗'),
-              ),
-            ],
+          ElevatedButton(
+            onPressed: _isSaving ? null : _saveName,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(56),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: Text(_isSaving ? 'Saving...' : 'Save Profile'),
           ),
+          const SizedBox(height: 20),
+          Text('Account details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700])),
+          const SizedBox(height: 12),
+          _buildAccountDetail('Email', user.email ?? 'Not provided'),
+          const SizedBox(height: 8),
+          _buildAccountDetail('Phone', user.phone ?? 'Not provided'),
+          const SizedBox(height: 8),
+          _buildAccountDetail('Verified', user.isVerified ? 'Yes' : 'No'),
         ],
       ),
     );
   }
 
-  Widget _buildActionBox(String text) {
+  Widget _buildAccountDetail(String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE8EAEE)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
+          Text(value, style: const TextStyle(color: Color(0xFF8C90A3))),
         ],
-      ),
-      child: Center(
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1B35),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileStats() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            RichText(
-              text: const TextSpan(
-                children: [
-                  TextSpan(
-                    text: '23hrs ',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1B35),
-                    ),
-                  ),
-                  TextSpan(
-                    text: 'Saved',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF8C90A3),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '38.5 km across 32 trips / 50 trips',
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF8C90A3),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF4F6FB),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Text('🚌', style: TextStyle(fontSize: 24)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF4F6FB),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Text('🚆', style: TextStyle(fontSize: 24)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -442,24 +326,22 @@ class ProfileScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
         children: [
-          _buildMenuButton('↗ Way Offline', Colors.white),
+          _buildMenuButton('Logout', Colors.white, _logout),
           const SizedBox(height: 12),
-          _buildMenuButton('Logout', Colors.white),
-          const SizedBox(height: 12),
-          _buildMenuButton('Delete Account', const Color(0xFFFFE5E5)),
+          _buildMenuButton('Delete Account', const Color(0xFFFFE5E5), _deleteAccount, textColor: const Color(0xFFFF4444)),
         ],
       ),
     );
   }
 
-  Widget _buildMenuButton(String text, Color bgColor) {
+  Widget _buildMenuButton(String text, Color bgColor, VoidCallback onPressed, {Color? textColor}) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: bgColor,
-          foregroundColor: const Color(0xFF1A1B35),
+          foregroundColor: textColor ?? const Color(0xFF1A1B35),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -471,7 +353,7 @@ class ProfileScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: text == 'Delete Account' ? const Color(0xFFFF4444) : const Color(0xFF1A1B35),
+            color: textColor ?? const Color(0xFF1A1B35),
           ),
         ),
       ),

@@ -18,10 +18,26 @@ DATABASE_URL = os.getenv(
 
 # For PostgreSQL, use: DATABASE_URL=postgresql://user:password@localhost:5432/way_transit
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
+def _create_engine(url: str):
+    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+    engine_kwargs = {"connect_args": connect_args} if connect_args else {}
+    if url.startswith("postgresql"):
+        engine_kwargs["pool_pre_ping"] = True
+    return create_engine(url, **engine_kwargs)
+
+engine = _create_engine(DATABASE_URL)
+
+if DATABASE_URL.startswith("postgresql"):
+    try:
+        with engine.connect():
+            pass
+    except Exception as exc:
+        warnings.warn(
+            f"PostgreSQL connection failed for DATABASE_URL={DATABASE_URL}. "
+            f"Falling back to SQLite for local startup. Error: {exc}"
+        )
+        DATABASE_URL = "sqlite:///./way_transit.db"
+        engine = _create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 

@@ -1,20 +1,119 @@
+from datetime import datetime
 from sqlalchemy.orm import Session
 import models
 import auth
 
-def create_user(db: Session, email: str, password: str):
-    hashed_password = auth.hash_password(password)
-    user = models.User(email=email, password=hashed_password)
+def create_user(
+    db: Session,
+    email: str,
+    password: str,
+    phone: str | None = None,
+    name: str | None = None,
+    google_id: str | None = None,
+    profile_image: str | None = None,
+    auth_provider: str | None = None,
+    is_verified: bool = False,
+):
+    hashed_password = auth.hash_password(password) if password else None
+    user = models.User(
+        email=email,
+        password=hashed_password,
+        phone=phone,
+        name=name,
+        google_id=google_id,
+        profile_image=profile_image,
+        auth_provider=auth_provider,
+        is_verified=is_verified,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
 
+
 def get_user_by_email(db: Session, email: str):
+    if not email:
+        return None
     return db.query(models.User).filter(models.User.email == email).first()
+
+
+def get_user_by_phone(db: Session, phone: str):
+    if not phone:
+        return None
+    return db.query(models.User).filter(models.User.phone == phone).first()
+
+
+def get_user_by_google_id(db: Session, google_id: str):
+    if not google_id:
+        return None
+    return db.query(models.User).filter(models.User.google_id == google_id).first()
+
 
 def get_user_by_id(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
+
+
+def update_user(db: Session, user: models.User, **fields):
+    for key, value in fields.items():
+        if hasattr(user, key) and value is not None:
+            setattr(user, key, value)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_user(db: Session, user: models.User):
+    # Remove related user-owned records first to avoid foreign key issues
+    db.query(models.Booking).filter(models.Booking.user_id == user.id).delete(synchronize_session=False)
+    db.query(models.Journey).filter(models.Journey.user_id == user.id).delete(synchronize_session=False)
+    db.query(models.SavedPlace).filter(models.SavedPlace.user_id == user.id).delete(synchronize_session=False)
+    db.query(models.RewardPoint).filter(models.RewardPoint.user_id == user.id).delete(synchronize_session=False)
+    db.query(models.Wallet).filter(models.Wallet.user_id == user.id).delete(synchronize_session=False)
+    db.query(models.TicketIngestJob).filter(models.TicketIngestJob.user_id == user.id).delete(synchronize_session=False)
+    db.delete(user)
+    db.commit()
+
+
+def get_otp_by_phone(db: Session, phone: str):
+    return db.query(models.OTPCode).filter(models.OTPCode.phone == phone).first()
+
+
+def create_or_update_otp_code(db: Session, phone: str, hashed_code: str, expires_at: datetime, now: datetime):
+    otp_record = get_otp_by_phone(db, phone)
+    if otp_record:
+        otp_record.hashed_code = hashed_code
+        otp_record.expires_at = expires_at
+        otp_record.last_sent_at = now
+        otp_record.request_count = (otp_record.request_count or 0) + 1
+        db.add(otp_record)
+    else:
+        otp_record = models.OTPCode(
+            phone=phone,
+            hashed_code=hashed_code,
+            expires_at=expires_at,
+            created_at=now,
+            last_sent_at=now,
+            first_requested_at=now,
+            request_count=1,
+        )
+        db.add(otp_record)
+    db.commit()
+    db.refresh(otp_record)
+    return otp_record
+
+
+def increment_otp_failed_attempts(db: Session, otp_record: models.OTPCode):
+    otp_record.failed_attempts = (otp_record.failed_attempts or 0) + 1
+    db.add(otp_record)
+    db.commit()
+    db.refresh(otp_record)
+    return otp_record
+
+
+def delete_otp_code(db: Session, otp_record: models.OTPCode):
+    db.delete(otp_record)
+    db.commit()
 
 def get_routes(db: Session, source: str, destination: str):
     from sqlalchemy import text

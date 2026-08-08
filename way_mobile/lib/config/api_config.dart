@@ -23,9 +23,10 @@ class ApiConfig {
     }
   }
 
-  static const String login = '/user/login';
-  static const String signup = '/user/signup';
-  static const String getCurrentUser = '/user/me';
+  static const String login = '/users/login';
+  static const String signup = '/users/signup';
+  static const String getCurrentUser = '/users/me';
+  static const String firebaseAuth = '/auth/firebase';
   static const String searchRoutes = '/search/routes';
   static const String bookRoute = '/booking/book';
   static const String myBookings = '/booking/my-bookings';

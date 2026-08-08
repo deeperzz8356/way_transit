@@ -15,10 +15,10 @@ class MapScreen extends StatelessWidget {
       ),
       body: FlutterMap(
         options: MapOptions(
-          center: center,
-          zoom: 13.0,
+          initialCenter: center,
+          initialZoom: 13.0,
           // Enable all gestures: pinch to zoom, scroll wheel, drag, etc.
-          interactiveFlags: InteractiveFlag.all,
+          interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
           // Reasonable zoom limits for OSM tiles
           minZoom: 5,
           maxZoom: 18,
