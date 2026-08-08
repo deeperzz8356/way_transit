@@ -19,15 +19,6 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   final _sourceController = TextEditingController();
   final _destinationController = TextEditingController();
   final _api = ApiService();
-
-  Uint8List? _imageBytes;
-  String? _imageFilename;
-  String? _uploadedImageUrl;
-  int? _jobId;
-  bool _isScanning = false;
-  bool _isSaving = false;
-  List<Map<String, dynamic>>? _transitMap;
-  final List<String> _liveTail = [];
   String? _error;
   StreamSubscription<Map<String, dynamic>>? _eventsSub;
 
@@ -89,24 +80,26 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
       });
 
       await _eventsSub?.cancel();
-      _eventsSub = _api.streamTicketJobEvents(upload.jobId).listen(
-        _onLiveEvent,
-        onError: (Object e) {
-          if (!mounted) return;
-          setState(() {
-            _error = e.toString();
-            _isScanning = false;
-            _liveTail.add('Live tail error: $e');
-          });
-          _pollJobFallback(upload.jobId);
-        },
-        onDone: () {
-          if (!mounted) return;
-          if (_isScanning) {
-            _pollJobFallback(upload.jobId);
-          }
-        },
-      );
+      _eventsSub = _api
+          .streamTicketJobEvents(upload.jobId)
+          .listen(
+            _onLiveEvent,
+            onError: (Object e) {
+              if (!mounted) return;
+              setState(() {
+                _error = e.toString();
+                _isScanning = false;
+                _liveTail.add('Live tail error: $e');
+              });
+              _pollJobFallback(upload.jobId);
+            },
+            onDone: () {
+              if (!mounted) return;
+              if (_isScanning) {
+                _pollJobFallback(upload.jobId);
+              }
+            },
+          );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -169,7 +162,8 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
     if (name == 'done' || name == 'timeout') {
       setState(() => _isScanning = false);
       if (_jobId != null &&
-          (_sourceController.text.isEmpty || _destinationController.text.isEmpty)) {
+          (_sourceController.text.isEmpty ||
+              _destinationController.text.isEmpty)) {
         _pollJobFallback(_jobId!);
       }
     }
@@ -234,7 +228,8 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   }
 
   void _handleManualEntry() {
-    if (_sourceController.text.isNotEmpty && _destinationController.text.isNotEmpty) {
+    if (_sourceController.text.isNotEmpty &&
+        _destinationController.text.isNotEmpty) {
       _generateTextMap(_sourceController.text, _destinationController.text);
     }
   }
@@ -292,9 +287,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Ticket / Pass'),
-      ),
+      appBar: AppBar(title: const Text('Add Ticket / Pass')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -320,7 +313,10 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                   children: [
                     const Text(
                       'Quick Photo Scanner',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -377,7 +373,10 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
                           'Stored: ${ApiConfig.resolveUrl(_uploadedImageUrl!)}',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -425,7 +424,10 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
               child: Center(
                 child: Text(
                   'OR',
-                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -437,7 +439,10 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                   children: [
                     const Text(
                       'Manual Entry',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -476,7 +481,10 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                       children: [
                         const Text(
                           'Active Transit Route',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         ..._transitMap!.map((step) {
