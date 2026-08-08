@@ -22,6 +22,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   final _qrPayloadController = TextEditingController();
   final _operatorController = TextEditingController();
   final _api = ApiService();
+<<<<<<< HEAD
 
   String _mode = 'other';
   Uint8List? _imageBytes;
@@ -32,6 +33,8 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   bool _isSaving = false;
   List<Map<String, dynamic>>? _transitMap;
   final List<String> _liveTail = [];
+=======
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
   String? _error;
   StreamSubscription<Map<String, dynamic>>? _eventsSub;
 
@@ -101,6 +104,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
       });
 
       await _eventsSub?.cancel();
+<<<<<<< HEAD
       _eventsSub = _api.streamTicketJobEvents(upload.jobId).listen(
         _onLiveEvent,
         onError: (Object e) {
@@ -117,6 +121,28 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
           if (_isScanning) _pollJobFallback(upload.jobId);
         },
       );
+=======
+      _eventsSub = _api
+          .streamTicketJobEvents(upload.jobId)
+          .listen(
+            _onLiveEvent,
+            onError: (Object e) {
+              if (!mounted) return;
+              setState(() {
+                _error = e.toString();
+                _isScanning = false;
+                _liveTail.add('Live tail error: $e');
+              });
+              _pollJobFallback(upload.jobId);
+            },
+            onDone: () {
+              if (!mounted) return;
+              if (_isScanning) {
+                _pollJobFallback(upload.jobId);
+              }
+            },
+          );
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -184,7 +210,15 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
 
     if (name == 'done' || name == 'timeout') {
       setState(() => _isScanning = false);
+<<<<<<< HEAD
       if (_jobId != null) _pollJobFallback(_jobId!);
+=======
+      if (_jobId != null &&
+          (_sourceController.text.isEmpty ||
+              _destinationController.text.isEmpty)) {
+        _pollJobFallback(_jobId!);
+      }
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
     }
   }
 
@@ -316,11 +350,15 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   Widget build(BuildContext context) {
     final accent = _modeColor(_mode);
     return Scaffold(
+<<<<<<< HEAD
       appBar: AppBar(
         title: const Text('Add Ticket / Pass'),
         backgroundColor: accent,
         foregroundColor: Colors.white,
       ),
+=======
+      appBar: AppBar(title: const Text('Add Ticket / Pass')),
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -340,10 +378,21 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
+<<<<<<< HEAD
                     const Text('Quick Photo Scanner',
                         style: TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
+=======
+                    const Text(
+                      'Quick Photo Scanner',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
                     Row(
                       children: [
                         Expanded(
@@ -381,7 +430,13 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                         child: Text(
                           'Stored: ${ApiConfig.resolveUrl(_uploadedImageUrl!)}',
                           style: const TextStyle(
+<<<<<<< HEAD
                               fontSize: 11, color: Colors.black45),
+=======
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -421,18 +476,39 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Center(
+<<<<<<< HEAD
                   child: Text('OR',
                       style: TextStyle(
                           color: Colors.grey, fontWeight: FontWeight.bold))),
+=======
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
             ),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
+<<<<<<< HEAD
                     const Text('Manual Entry',
                         style: TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold)),
+=======
+                    const Text(
+                      'Manual Entry',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
                     const SizedBox(height: 16),
                     TextField(
                       controller: _sourceController,
@@ -515,9 +591,19 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+<<<<<<< HEAD
                         const Text('Active Transit Route',
                             style: TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold)),
+=======
+                        const Text(
+                          'Active Transit Route',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+>>>>>>> 74193328e1aa0fda0bd7e5042ab5ec7e0bc20e3f
                         const SizedBox(height: 16),
                         ..._transitMap!.map((step) {
                           return Padding(
