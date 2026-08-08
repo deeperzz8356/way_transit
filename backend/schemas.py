@@ -225,6 +225,25 @@ class WalletResponse(BaseModel):
     tickets: List[BookingResponse] = Field(default_factory=list)
     passes: List[UserPassResponse] = Field(default_factory=list)
 
+class PhoneRequest(BaseModel):
+    phone: str
+
+class OtpVerifyRequest(BaseModel):
+    phone: str
+    otp: str
+
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+class FirebaseAuthRequest(BaseModel):
+    id_token: str
+
+class UserUpdateRequest(BaseModel):
+    name: str
+
+class MessageResponse(BaseModel):
+    message: str
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -232,6 +251,21 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
+
+class UserResponse(BaseModel):
+    id: int
+    phone: Optional[str] = None
+    name: Optional[str] = None
+    email: Optional[str] = None
+    google_id: Optional[str] = None
+    profile_image: Optional[str] = None
+    auth_provider: Optional[str] = None
+    is_verified: bool = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 class MapStopResponse(BaseModel):
     id: int

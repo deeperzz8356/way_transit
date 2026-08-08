@@ -227,18 +227,34 @@ class FareMatrix(Base):
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    phone = Column(String, unique=True, index=True)
-    name = Column(String)
-    email = Column(String, unique=True, index=True)
-    password = Column(String)
+    phone = Column(String, unique=True, index=True, nullable=True)
+    name = Column(String, nullable=True)
+    email = Column(String, unique=True, index=True, nullable=True)
+    password = Column(String, nullable=True)
+    google_id = Column(String, unique=True, index=True, nullable=True)
+    profile_image = Column(String, nullable=True)
+    auth_provider = Column(String, nullable=True)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     bookings = relationship("Booking", back_populates="user")
     journeys = relationship("Journey", back_populates="user")
     saved_places = relationship("SavedPlace", back_populates="user")
     reward_points = relationship("RewardPoint", back_populates="user")
     wallet = relationship("Wallet", uselist=False, back_populates="user")
+
+class OTPCode(Base):
+    __tablename__ = "otp_codes"
+    id = Column(Integer, primary_key=True, index=True)
+    phone = Column(String, unique=True, index=True, nullable=False)
+    hashed_code = Column(String, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_sent_at = Column(DateTime, default=datetime.utcnow)
+    first_requested_at = Column(DateTime, default=datetime.utcnow)
+    request_count = Column(Integer, default=1)
+    failed_attempts = Column(Integer, default=0)
 
 class Wallet(Base):
     __tablename__ = "wallets"

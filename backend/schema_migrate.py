@@ -83,3 +83,33 @@ def ensure_ticket_schema():
                     """
                 )
             )
+
+        if "otp_codes" not in tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE otp_codes (
+                        id INTEGER PRIMARY KEY,
+                        phone VARCHAR UNIQUE NOT NULL,
+                        hashed_code VARCHAR NOT NULL,
+                        expires_at TIMESTAMP NOT NULL,
+                        created_at TIMESTAMP,
+                        last_sent_at TIMESTAMP,
+                        first_requested_at TIMESTAMP,
+                        request_count INTEGER DEFAULT 1,
+                        failed_attempts INTEGER DEFAULT 0
+                    )
+                    """
+                )
+            )
+
+        if "users" in tables:
+            cols = {c["name"] for c in inspector.get_columns("users")}
+            if "google_id" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR"))
+            if "profile_image" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR"))
+            if "auth_provider" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN auth_provider VARCHAR"))
+            if "updated_at" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN updated_at TIMESTAMP"))

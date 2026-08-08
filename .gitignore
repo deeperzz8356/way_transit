@@ -10,7 +10,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-# lib/  # Commented out to allow Flutter lib directory
 lib64/
 parts/
 sdist/
@@ -25,17 +24,42 @@ venv/
 ENV/
 env/
 
-# IDE
+# IDE & Workspace
 .vscode/
 .idea/
+.vs/
 *.swp
 *.swo
 *~
 .DS_Store
+graphify-out/
 
-# Environment
+# Environment Variables & Config
 .env
-.env.local
+.env.*
+!.env.example
+*.env
+
+# Confidential Credentials & Keys
+firebase-admin.json
+**/firebase-admin.json
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+secrets.json
+**/secrets.json
+credentials.json
+**/credentials.json
+client_secret*.json
+service_account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.jks
+*.keystore
 
 # Database
 *.db
@@ -43,8 +67,9 @@ env/
 *.sqlite3
 way_transit.db
 
-# Uploaded ticket images
+# Uploads & Temporary Data
 backend/uploads/
+data/
 
 # Node
 node_modules/
@@ -57,14 +82,15 @@ build/
 dist/
 *.egg-info/
 
-# Logs
+# Logs & Temporary Files
 *.log
 logs/
+*.bak
+*.tmp
 
 # OS
 .DS_Store
 Thumbs.db
-.env.example
 start.bat
 start.sh
 data

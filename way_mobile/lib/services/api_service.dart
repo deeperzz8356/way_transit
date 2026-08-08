@@ -75,6 +75,62 @@ class ApiService {
     }
   }
 
+  // OAuth-style login (development helper)
+  Future<Map<String, dynamic>> oauthLogin({required String provider, required String email, String? providerId}) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/user/oauth_login'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'provider': provider,
+        'email': email,
+        'provider_id': providerId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('OAuth login failed: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> firebaseAuth(String idToken) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl${ApiConfig.firebaseAuth}'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'id_token': idToken}),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Firebase authentication failed: ${response.body}');
+  }
+
+  Future<User> updateCurrentUser(String name) async {
+    final response = await http.put(
+      Uri.parse('$_baseUrl${ApiConfig.getCurrentUser}'),
+      headers: _headers,
+      body: json.encode({'name': name}),
+    );
+
+    if (response.statusCode == 200) {
+      return User.fromJson(json.decode(response.body));
+    }
+    throw Exception('Update profile failed: ${response.body}');
+  }
+
+  Future<void> deleteCurrentUser() async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl${ApiConfig.getCurrentUser}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      return;
+    }
+    throw Exception('Delete account failed: ${response.body}');
+  }
+
   Future<User> signup(String email, String password) async {
     final response = await http.post(
       Uri.parse('$_baseUrl${ApiConfig.signup}'),

@@ -3,7 +3,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/booking.dart';
+import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../nav/app_nav.dart';
 import '../config/api_config.dart';
 import 'map_screen.dart';
@@ -18,6 +20,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiService();
   final _mapController = MapController();
+  late final AuthService _authService;
+  late Future<User> _userFuture;
   Booking? _activeTicket;
   bool _isLoading = true;
   LatLng? _fromPoint;
@@ -26,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    super.initState();
+    _authService = AuthService(_api);
+    _userFuture = _authService.getCurrentUser();
     _fetchActiveTicket();
     AppNav.homeRefreshTick.addListener(_onHomeRefresh);
   }
@@ -178,39 +185,58 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+    return FutureBuilder<User>(
+      future: _userFuture,
+      builder: (context, snapshot) {
+        String greetingName = '';
+        if (snapshot.hasData && snapshot.data != null) {
+          final user = snapshot.data!;
+          if (user.name != null && user.name!.trim().isNotEmpty) {
+            greetingName = user.name!.trim();
+          } else if (user.email != null && user.email!.trim().isNotEmpty) {
+            greetingName = user.email!.trim();
+          } else if (user.phone != null && user.phone!.trim().isNotEmpty) {
+            greetingName = user.phone!.trim();
+          }
+        }
+
+        final greetingText = greetingName.isNotEmpty ? 'Hello $greetingName!' : 'Hello!';
+
+        return Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('👋', style: TextStyle(fontSize: 24)),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  const Text(
-                    'Hello Daniel!',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1B35),
-                    ),
+                  const Text('👋', style: TextStyle(fontSize: 24)),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        greetingText,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1B35),
+                        ),
+                      ),
+                    ],
                   ),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildIconBtn('📅'),
+                  const SizedBox(width: 12),
+                  _buildIconBtn('🔔'),
                 ],
               ),
             ],
           ),
-          Row(
-            children: [
-              _buildIconBtn('📅'),
-              const SizedBox(width: 12),
-              _buildIconBtn('🔔'),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -223,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -442,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 4),
             ),
@@ -520,7 +546,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -562,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -683,7 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -820,7 +846,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
