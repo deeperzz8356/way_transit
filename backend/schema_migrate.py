@@ -13,6 +13,24 @@ def ensure_ticket_schema():
     tables = set(inspector.get_table_names())
 
     with engine.begin() as conn:
+        if "ticket_trips" not in tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE ticket_trips (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        name VARCHAR NOT NULL,
+                        notes VARCHAR,
+                        travel_date DATE,
+                        created_at TIMESTAMP,
+                        updated_at TIMESTAMP
+                    )
+                    """
+                )
+            )
+            tables.add("ticket_trips")
+
         if "bookings" in tables:
             cols = {c["name"] for c in inspector.get_columns("bookings")}
             _add_col(conn, "bookings", cols, "source", "source VARCHAR")
@@ -29,6 +47,7 @@ def ensure_ticket_schema():
             _add_col(conn, "bookings", cols, "source_type", "source_type VARCHAR")
             _add_col(conn, "bookings", cols, "journey_started_at", "journey_started_at TIMESTAMP")
             _add_col(conn, "bookings", cols, "journey_estimated_end_at", "journey_estimated_end_at TIMESTAMP")
+            _add_col(conn, "bookings", cols, "ticket_trip_id", "ticket_trip_id INTEGER")
 
         if "ticket_ingest_jobs" not in tables:
             conn.execute(
