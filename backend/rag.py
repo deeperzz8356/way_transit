@@ -1,12 +1,17 @@
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
+import faiss
+from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
 import models
 
 # Global variables for RAG
 vector_store = None
-# This will download the model to your local machine the first time it runs
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vector_texts: list[str] = []
+vector_metadatas: list[dict] = []
+vector_index = None
+
+# Load the embeddings model once
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
 
 def _get_route_texts(db: Session) -> tuple[list[str], list[dict]]:
     routes = db.query(models.Route).all()
@@ -68,8 +73,12 @@ def _get_stop_and_schedule_texts(db: Session) -> tuple[list[str], list[dict]]:
     return texts, metadatas
 
 
+def _encode_texts(texts: list[str]):
+    return embedder.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+
+
 def sync_db_to_vectorstore(db: Session):
-    global vector_store
+    global vector_store, vector_texts, vector_metadatas, vector_index
     r_texts, r_metadatas = _get_route_texts(db)
     rt_texts, rt_metadatas = _get_realtime_texts(db)
     s_texts, s_metadatas = _get_stop_and_schedule_texts(db)
@@ -81,19 +90,36 @@ def sync_db_to_vectorstore(db: Session):
         "Please arrive 10 minutes before departure time. Emergency helpline is 1800-WAY-SAFE."
     )
     metadatas.append({"type": "policy", "route_id": 0})
+
     if texts:
-        vector_store = FAISS.from_texts(texts, embeddings, metadatas=metadatas)
-        print("Successfully synced Postgres routes into FAISS Vector Store.")
+        embeddings = _encode_texts(texts)
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dimension)
+        index.add(embeddings)
+
+        vector_store = {
+            "index": index,
+            "texts": texts,
+            "metadatas": metadatas,
+            "embeddings": embeddings,
+        }
+        vector_texts = texts
+        vector_metadatas = metadatas
+        vector_index = index
+        print("Successfully synced Postgres routes into FAISS vector store.")
     else:
         print("No data found to build the vector store.")
 
+
 def retrieve_context(query: str, k: int = 3) -> str:
-    global vector_store
-    if not vector_store:
+    global vector_store, vector_index
+    if not vector_store or vector_index is None:
         return "Knowledge base not initialized."
-    
-    # Find the top k most relevant routes/policies based on the user's message
-    docs = vector_store.similarity_search(query, k=k)
-    
-    context = "\n".join([doc.page_content for doc in docs])
-    return context
+
+    query_embedding = _encode_texts([query])
+    distances, indices = vector_index.search(query_embedding, k)
+    results = []
+    for idx in indices[0]:
+        if idx < len(vector_texts):
+            results.append(vector_texts[idx])
+    return "\n".join(results)

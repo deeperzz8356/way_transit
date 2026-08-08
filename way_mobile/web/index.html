@@ -31,6 +31,8 @@
 
   <title>way_mobile</title>
   <link rel="manifest" href="manifest.json">
+  <!-- reCAPTCHA for Firebase Phone Auth -->
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
   <!--
@@ -41,6 +43,8 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!-- recaptcha-container required for Firebase Phone Auth widget -->
+  <div id="recaptcha-container" style="display:none;"></div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

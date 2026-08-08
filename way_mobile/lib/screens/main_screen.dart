@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
-import 'ai_helper_screen.dart';
-import 'chat_screen.dart';
 import 'wallet_screen.dart';
 import 'add_ticket_screen.dart';
 

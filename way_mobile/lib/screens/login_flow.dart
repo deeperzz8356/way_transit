@@ -43,6 +43,19 @@ class _LoginFlowState extends State<LoginFlow> {
     setState(() => _currentStep = step);
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      await _authService.signInWithGoogle();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const MainScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google sign-in failed: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,15 +86,19 @@ class _LoginFlowState extends State<LoginFlow> {
         return StartStep(
           key: const ValueKey('start'),
           onNext: () => _nextStep(LoginStep.phone),
+          onGoogleSignIn: _handleGoogleSignIn,
         );
       case LoginStep.phone:
         return PhoneStep(
           key: const ValueKey('phone'),
-          onNext: () => _nextStep(LoginStep.profile),
+          authService: _authService,
+          onVerified: () => _nextStep(LoginStep.profile),
+          onGoogleSignIn: _handleGoogleSignIn,
         );
       case LoginStep.profile:
         return ProfileStep(
           key: const ValueKey('profile'),
+          authService: _authService,
           onNext: () => _nextStep(LoginStep.preferences),
         );
       case LoginStep.preferences:
@@ -313,7 +330,8 @@ class _SplashStepState extends State<SplashStep> with SingleTickerProviderStateM
 
 class StartStep extends StatelessWidget {
   final VoidCallback onNext;
-  const StartStep({super.key, required this.onNext});
+  final VoidCallback? onGoogleSignIn;
+  const StartStep({super.key, required this.onNext, this.onGoogleSignIn});
 
   @override
   Widget build(BuildContext context) {
@@ -335,14 +353,14 @@ class StartStep extends StatelessWidget {
           const SizedBox(height: 32),
           PrimaryButton(text: 'Continue with Phone', onPressed: onNext),
           const SizedBox(height: 12),
-          SecondaryButton(text: 'Continue with Gmail', onPressed: onNext),
+          SecondaryButton(text: 'Continue with Gmail', onPressed: onGoogleSignIn ?? onNext),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildIconButton(''),
               const SizedBox(width: 16),
-              _buildIconButton('G'),
+              GestureDetector(onTap: onGoogleSignIn, child: _buildIconButton('G')),
             ],
           ),
           const SizedBox(height: 32),
@@ -369,9 +387,103 @@ class StartStep extends StatelessWidget {
   }
 }
 
-class PhoneStep extends StatelessWidget {
-  final VoidCallback onNext;
-  const PhoneStep({super.key, required this.onNext});
+class PhoneStep extends StatefulWidget {
+  final AuthService authService;
+  final VoidCallback onVerified;
+  final VoidCallback? onGoogleSignIn;
+
+  const PhoneStep({
+    super.key,
+    required this.authService,
+    required this.onVerified,
+    this.onGoogleSignIn,
+  });
+
+  @override
+  State<PhoneStep> createState() => _PhoneStepState();
+}
+
+class _PhoneStepState extends State<PhoneStep> {
+  final TextEditingController _phoneController = TextEditingController();
+  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  bool _otpSent = false;
+  bool _isLoading = false;
+  String? _statusMessage;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    for (final controller in _otpControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _sendOtp() async {
+    final phoneText = _phoneController.text.trim();
+    if (phoneText.isEmpty) {
+      setState(() => _statusMessage = 'Please enter your phone number.');
+      return;
+    }
+
+    String phone = phoneText;
+    if (!phone.startsWith('+')) {
+      phone = '+91$phone';
+    }
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = null;
+    });
+
+    try {
+      await widget.authService.requestPhoneOtp(phone);
+      setState(() {
+        _otpSent = true;
+        _statusMessage = 'OTP sent to $phone. Enter it below.';
+      });
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Failed to send OTP: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    final otp = _otpControllers.map((controller) => controller.text.trim()).join();
+    if (otp.length != 6) {
+      setState(() => _statusMessage = 'Enter the 6-digit OTP.');
+      return;
+    }
+
+    final phoneText = _phoneController.text.trim();
+    String phone = phoneText;
+    if (!phone.startsWith('+')) {
+      phone = '+91$phone';
+    }
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = null;
+    });
+
+    try {
+      await widget.authService.verifyPhoneOtp(phone, otp);
+      widget.onVerified();
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'OTP verification failed: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -394,6 +506,7 @@ class PhoneStep extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: TextField(
+                  controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
                     hintText: '000 000 0000',
@@ -407,18 +520,28 @@ class PhoneStep extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          const Text('Enter Otp', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(6, (index) => _buildOtpBox(context)),
-          ),
+          if (_otpSent) ...[
+            const Text('Enter Otp', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(6, (index) => _buildOtpBox(index)),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (_statusMessage != null) ...[
+            Text(_statusMessage!, style: const TextStyle(color: Color(0xFF5974FF))),
+            const SizedBox(height: 16),
+          ],
           const Spacer(),
-          PrimaryButton(text: 'Confirm', onPressed: onNext),
+          PrimaryButton(
+            text: _otpSent ? 'Confirm OTP' : 'Send OTP',
+            onPressed: _isLoading ? () {} : (_otpSent ? _verifyOtp : _sendOtp),
+          ),
           const SizedBox(height: 16),
           Center(
             child: TextButton(
-              onPressed: () {},
+              onPressed: widget.onGoogleSignIn,
               child: const Text('Continue with Google', style: TextStyle(color: Color(0xFF5974FF), fontWeight: FontWeight.w600)),
             ),
           )
@@ -427,28 +550,95 @@ class PhoneStep extends StatelessWidget {
     );
   }
 
-  Widget _buildOtpBox(BuildContext context) {
+  Widget _buildOtpBox(int index) {
     return Container(
       width: 50,
       height: 50,
       decoration: BoxDecoration(color: const Color(0xFFF4F6FB), borderRadius: BorderRadius.circular(12)),
       child: TextField(
+        controller: _otpControllers[index],
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         maxLength: 1,
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         decoration: const InputDecoration(border: InputBorder.none, counterText: ''),
         onChanged: (value) {
-          if (value.length == 1) FocusScope.of(context).nextFocus();
+          if (value.length == 1) {
+            if (index + 1 < _otpControllers.length) {
+              FocusScope.of(context).nextFocus();
+            } else {
+              FocusScope.of(context).unfocus();
+            }
+          }
         },
       ),
     );
   }
 }
 
-class ProfileStep extends StatelessWidget {
+class ProfileStep extends StatefulWidget {
+  final AuthService authService;
   final VoidCallback onNext;
-  const ProfileStep({super.key, required this.onNext});
+
+  const ProfileStep({super.key, required this.authService, required this.onNext});
+
+  @override
+  State<ProfileStep> createState() => _ProfileStepState();
+}
+
+class _ProfileStepState extends State<ProfileStep> {
+  final TextEditingController _nameController = TextEditingController();
+  bool _isLoading = false;
+  String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final user = await widget.authService.getCurrentUser();
+      _nameController.text = user.name ?? '';
+    } catch (_) {
+      setState(() {
+        _statusMessage = 'Unable to load profile information right now.';
+      });
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _statusMessage = 'Please enter your name before continuing.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = null;
+    });
+
+    try {
+      await widget.authService.updateProfileName(name);
+      widget.onNext();
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Unable to save profile: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -460,25 +650,30 @@ class ProfileStep extends StatelessWidget {
           const Center(child: Text('Create your Profile', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35)))),
           const SizedBox(height: 32),
           _buildInputLabel('Your Name'),
-          _buildTextField(),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildInputLabel('Age'), _buildTextField()])),
-              const SizedBox(width: 16),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildInputLabel('Gender'), _buildTextField()])),
-            ],
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              hintText: 'Enter your name',
+              filled: true,
+              fillColor: const Color(0xFFF4F6FB),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            ),
           ),
           const SizedBox(height: 16),
-          _buildInputLabel('Your Profession'),
-          _buildTextField(),
-          const SizedBox(height: 16),
-          _buildInputLabel('Upload concession proof (if any)'),
-          Row(
-            children: List.generate(3, (index) => Padding(padding: const EdgeInsets.only(right: 12), child: _buildUploadBox())),
+          const Text(
+            'This name will appear in your profile and help personalize your experience.',
+            style: TextStyle(fontSize: 14, color: Color(0xFF8C90A3), height: 1.5),
           ),
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 16),
+            Text(_statusMessage!, style: const TextStyle(color: Color(0xFF5974FF))),
+          ],
           const Spacer(),
-          PrimaryButton(text: 'Confirm', onPressed: onNext),
+          PrimaryButton(
+            text: _isLoading ? 'Saving…' : 'Continue',
+            onPressed: _isLoading ? () {} : _saveProfile,
+          ),
         ],
       ),
     );
@@ -488,29 +683,6 @@ class ProfileStep extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
-    );
-  }
-
-  Widget _buildTextField() {
-    return TextField(
-      decoration: InputDecoration(
-        filled: true, fillColor: const Color(0xFFF4F6FB),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      ),
-    );
-  }
-
-  Widget _buildUploadBox() {
-    return Container(
-      width: 72, height: 72,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F6FB),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC0C4D6), width: 2, style: BorderStyle.solid), // Dashed not natively supported easily without custom painter, solid for mockup
-      ),
-      alignment: Alignment.center,
-      child: const Icon(Icons.add, color: Color(0xFFC0C4D6), size: 32),
     );
   }
 }
@@ -550,8 +722,11 @@ class _PreferencesStepState extends State<PreferencesStep> {
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        if (isActive) selectedPrefs.remove(pref);
-                        else selectedPrefs.add(pref);
+                        if (isActive) {
+                          selectedPrefs.remove(pref);
+                        } else {
+                          selectedPrefs.add(pref);
+                        }
                       });
                     },
                     child: Container(

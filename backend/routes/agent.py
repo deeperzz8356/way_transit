@@ -7,8 +7,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../w
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from langchain_core.messages import HumanMessage
-from graph import app as graph_app
 from database import SessionLocal
 import models
 from dependencies import get_current_user
@@ -39,6 +37,17 @@ async def chat_with_agent(
     db: Session = Depends(get_db)
 ):
     try:
+        # Import the agent graph lazily so the API can start even if agent deps are missing
+        try:
+            from graph import app as graph_app
+        except Exception as imp_err:
+            raise HTTPException(status_code=503, detail=f"Agent dependencies not available: {imp_err}")
+
+        try:
+            from langchain_core.messages import HumanMessage
+        except Exception as imp_err:
+            raise HTTPException(status_code=503, detail=f"Agent dependencies not available: {imp_err}")
+
         # Fetch User Data
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user:
