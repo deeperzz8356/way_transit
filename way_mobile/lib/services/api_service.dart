@@ -527,7 +527,15 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return TicketTrip.fromJson(json.decode(response.body) as Map<String, dynamic>);
     }
-    throw Exception('Failed to create trip: ${response.body}');
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Please log in again to create a collection');
+    }
+    if (response.statusCode == 404) {
+      throw Exception(
+        'Collection API not found — restart the backend with the latest code',
+      );
+    }
+    throw Exception('Failed to create collection (${response.statusCode}): ${response.body}');
   }
 
   Future<TicketTrip> getTrip(int tripId) async {

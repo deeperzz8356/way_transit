@@ -682,15 +682,18 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                       ],
                       const SizedBox(height: 16),
                       DropdownButtonFormField<int?>(
-                        value: _selectedTripId,
+                        value: (_selectedTripId != null &&
+                                _trips.any((t) => t.id == _selectedTripId))
+                            ? _selectedTripId
+                            : null,
                         decoration: const InputDecoration(
-                          labelText: 'Add to trip (optional)',
+                          labelText: 'Add to collection (optional)',
                           border: OutlineInputBorder(),
                         ),
                         items: [
                           const DropdownMenuItem<int?>(
                             value: null,
-                            child: Text('No trip — keep ungrouped'),
+                            child: Text('No collection — keep ungrouped'),
                           ),
                           ..._trips.map(
                             (t) => DropdownMenuItem<int?>(
@@ -707,7 +710,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                         child: TextButton.icon(
                           onPressed: _createTripInline,
                           icon: const Icon(Icons.add, size: 18),
-                          label: const Text('New trip'),
+                          label: const Text('New collection'),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -723,7 +726,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                               ? 'Saving…'
                               : (_selectedTripId == null
                                   ? 'Save to Wallet'
-                                  : 'Save to Trip'),
+                                  : 'Save to collection'),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

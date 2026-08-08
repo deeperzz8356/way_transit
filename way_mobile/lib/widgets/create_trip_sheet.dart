@@ -49,7 +49,7 @@ class _CreateTripSheetState extends State<CreateTripSheet> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a trip name')),
+        const SnackBar(content: Text('Please enter a collection name')),
       );
       return;
     }
@@ -85,7 +85,7 @@ class _CreateTripSheetState extends State<CreateTripSheet> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'New trip',
+            'New collection',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
@@ -99,7 +99,7 @@ class _CreateTripSheetState extends State<CreateTripSheet> {
             autofocus: true,
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-              labelText: 'Trip name',
+              labelText: 'Collection name',
               hintText: 'e.g. Mumbai weekend',
               border: OutlineInputBorder(),
             ),
@@ -127,7 +127,7 @@ class _CreateTripSheetState extends State<CreateTripSheet> {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _submit,
-            child: const Text('Create trip'),
+            child: const Text('Create collection'),
           ),
           const SizedBox(height: 8),
         ],

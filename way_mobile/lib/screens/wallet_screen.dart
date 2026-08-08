@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
-import '../widgets/create_trip_sheet.dart';
+import '../widgets/create_collection_wizard.dart';
 import '../widgets/trip_picker_sheet.dart';
 import 'ticket_detail_screen.dart';
 import 'trip_detail_screen.dart';
@@ -191,31 +191,24 @@ class _WalletScreenState extends State<WalletScreen>
   }
 
   Future<void> _createTrip() async {
-    final data = await showCreateTripSheet(context);
-    if (data == null || data['name'] == null) return;
-    try {
-      await _ensureToken();
-      final trip = await _api.createTrip(
-        name: data['name']!,
-        notes: data['notes'],
-        travelDate: data['travelDate'],
-      );
-      await _fetchWallet();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Trip "${data['name']}" created')),
-      );
-      // Open the new trip so the user can add tickets immediately.
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => TripDetailScreen(trip: trip),
-        ),
-      );
-      _fetchWallet();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
+    await _ensureToken();
+    final created = await showCreateCollectionWizard(
+      context,
+      api: _api,
+      selectableTickets: _tickets,
+    );
+    if (created == null) return;
+    await _fetchWallet();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Collection "${created.name}" created')),
+    );
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TripDetailScreen(trip: created),
+      ),
+    );
+    _fetchWallet();
   }
 
   Future<void> _addSelectedToTrip() async {
@@ -268,14 +261,9 @@ class _WalletScreenState extends State<WalletScreen>
           if (_selectMode)
             TextButton(
               onPressed: _selectedIds.isEmpty ? null : _addSelectedToTrip,
-              child: const Text('Add to trip'),
+              child: const Text('Add to collection'),
             )
           else ...[
-            IconButton(
-              onPressed: _createTrip,
-              tooltip: 'New trip',
-              icon: const Icon(Icons.create_new_folder_outlined),
-            ),
             IconButton(
               onPressed: () => setState(() => _selectMode = true),
               tooltip: 'Select tickets',
@@ -302,6 +290,13 @@ class _WalletScreenState extends State<WalletScreen>
           ],
         ),
       ),
+      floatingActionButton: _selectMode
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _createTrip,
+              icon: const Icon(Icons.create_new_folder_outlined),
+              label: const Text('New collection'),
+            ),
       body: Column(
         children: [
           SingleChildScrollView(
@@ -367,7 +362,7 @@ class _WalletScreenState extends State<WalletScreen>
                             ],
                             if (_visibleTrips.isNotEmpty) ...[
                               const Text(
-                                'Trips',
+                                'Collections',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -378,15 +373,36 @@ class _WalletScreenState extends State<WalletScreen>
                               const SizedBox(height: 16),
                             ] else if (!_selectMode) ...[
                               Card(
+                                color: Colors.blue.shade50,
                                 margin: const EdgeInsets.only(bottom: 16),
-                                child: ListTile(
-                                  leading: const Icon(Icons.create_new_folder_outlined),
-                                  title: const Text('Create a trip'),
-                                  subtitle: const Text(
-                                    'Name a trip first, then add tickets to it',
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      const Text(
+                                        'Group tickets into a collection',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Example: “Mumbai weekend” with train + metro + cab tickets.',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ElevatedButton.icon(
+                                        onPressed: _createTrip,
+                                        icon: const Icon(Icons.add),
+                                        label: const Text('Create collection'),
+                                      ),
+                                    ],
                                   ),
-                                  trailing: const Icon(Icons.chevron_right),
-                                  onTap: _createTrip,
                                 ),
                               ),
                             ],
@@ -412,7 +428,7 @@ class _WalletScreenState extends State<WalletScreen>
                                   padding: EdgeInsets.symmetric(vertical: 48),
                                   child: Center(
                                     child: Text(
-                                      'No tickets in this view.\nAdd a ticket or create a trip!',
+                                      'No tickets in this view.\nCreate a collection or add a ticket!',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 16,
@@ -424,6 +440,7 @@ class _WalletScreenState extends State<WalletScreen>
                               else
                                 ..._filteredUngrouped.map(_buildTicketCard),
                             ],
+                            const SizedBox(height: 88),
                           ],
                         ),
                       ),
@@ -522,7 +539,7 @@ class _WalletScreenState extends State<WalletScreen>
                   _fetchWallet();
                 },
                 icon: const Icon(Icons.add),
-                label: const Text('Open trip & add tickets'),
+                label: const Text('Open & add tickets'),
               ),
             )
           else if (expanded && filtered.isEmpty)

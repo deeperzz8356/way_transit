@@ -198,14 +198,14 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             children: [
               const ListTile(
                 title: Text(
-                  'Add to this trip',
+                  'Add to this collection',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
               ListTile(
                 leading: const Icon(Icons.confirmation_number_outlined),
                 title: const Text('Add new ticket'),
-                subtitle: const Text('Scan or enter a ticket into this trip'),
+                subtitle: const Text('Scan or enter a ticket into this collection'),
                 onTap: () => Navigator.pop(ctx, 'new'),
               ),
               ListTile(
@@ -357,13 +357,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                       child: Column(
                         children: [
                           const Text(
-                            'No tickets in this trip yet.',
+                            'This collection is empty.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey, fontSize: 16),
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Add a new ticket or move existing ones from your wallet.',
+                            'Add a new ticket now, or move existing wallet tickets in.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey),
                           ),
@@ -371,11 +371,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                           ElevatedButton.icon(
                             onPressed: _addNewTicket,
                             icon: const Icon(Icons.confirmation_number_outlined),
-                            label: const Text('Add new ticket'),
+                            label: const Text('Add new ticket here'),
                           ),
-                          TextButton(
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
                             onPressed: _addTickets,
-                            child: const Text('Choose how to add'),
+                            icon: const Icon(Icons.playlist_add_check),
+                            label: const Text('Add from wallet'),
                           ),
                         ],
                       ),

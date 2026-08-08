@@ -64,13 +64,13 @@ class TripPickerSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Add to trip',
+            'Add to collection',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.add_circle_outline),
-            title: const Text('Create new trip'),
+            title: const Text('Create new collection'),
             onTap: () async {
               final created = await showCreateTripSheet(context);
               if (created == null) return;
@@ -113,7 +113,7 @@ class TripPickerSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'No trips yet — create one to group tickets.',
+                'No collections yet — create one to group tickets.',
                 style: TextStyle(color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),
