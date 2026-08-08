@@ -86,7 +86,9 @@ def real_time_node(state: AgentState) -> dict:
 
 
 def ticketing_node(state: AgentState) -> dict:
-    return run_agent("Ticketing Agent", state)
+    from agents.ticketing import ticketing_node as real_ticketing
+
+    return real_ticketing(state)
 
 
 def tourist_node(state: AgentState) -> dict:

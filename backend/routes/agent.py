@@ -44,20 +44,30 @@ async def chat_with_agent(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Fetch User's Bookings
-        bookings = db.query(models.Booking).filter(models.Booking.user_id == user_id).all()
+        # Fetch User's Wallet Tickets (actual fields)
+        bookings = (
+            db.query(models.Booking)
+            .filter(models.Booking.user_id == user_id)
+            .order_by(models.Booking.booked_at.desc())
+            .all()
+        )
         booking_details = []
-        for b in bookings:
-            route = db.query(models.Route).filter(models.Route.id == b.route_id).first()
-            if route:
-                booking_details.append(f"Booking ID: {b.id}, Route: {route.source} to {route.destination} via {route.transport}, Status: {b.status}")
+        for b in bookings[:20]:
+            booking_details.append(
+                f"Ticket ID: {b.id}, {b.source or '?'} → {b.destination or '?'}, "
+                f"mode={b.mode or 'other'}, status={b.status}, "
+                f"ticket_number={b.ticket_number or 'n/a'}, "
+                f"operator={b.operator_name or 'n/a'}"
+            )
         
         # 3. Retrieve Context via RAG
         from rag import retrieve_context
+        from context_enricher import maybe_enrich_context, web_search_available
+
         rag_context = retrieve_context(request.message)
         
         # Construct db_context string
-        bookings_context = "\n".join(booking_details) if booking_details else "No current bookings."
+        bookings_context = "\n".join(booking_details) if booking_details else "No tickets in wallet."
         
         db_context = f"""
 --- DATABASE CONTEXT ---
@@ -65,18 +75,22 @@ CURRENT USER:
 Email: {user.email}
 User ID: {user.id}
 
-USER'S CURRENT BOOKINGS:
+USER UNIFIED WALLET:
 {bookings_context}
 
 RELEVANT TRANSIT KNOWLEDGE & ROUTES:
 {rag_context}
 ------------------------
 """
+        # Supplement with web search when query needs current/external info
+        if web_search_available():
+            db_context = maybe_enrich_context(request.message, db_context)
 
         # Initialize state with db_context
         state = {
             "messages": [HumanMessage(content=request.message)],
-            "db_context": db_context
+            "db_context": db_context,
+            "user_id": user_id,
         }
         
         # Run graph with user thread memory config

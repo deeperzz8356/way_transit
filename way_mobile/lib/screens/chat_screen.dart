@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Simple chat screen that mirrors the web ChatPage component.
-/// Sends user messages to the backend endpoint `/agent/chat` and displays
-/// the agent's response. Uses a POST request with the stored JWT token.
+import '../config/api_config.dart';
+
+/// Chat with WAY Ticketing / multi-agent backend at `/agent/chat`.
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -15,14 +15,20 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final List<_Message> _messages = [];
+  final List<_Message> _messages = [
+    _Message(
+      sender: Sender.agent,
+      text:
+          'Ask about your wallet — e.g. “show my metro tickets” or “start journey on latest rail ticket”.',
+      agentName: 'Ticketing Agent',
+    ),
+  ];
   final TextEditingController _controller = TextEditingController();
   bool _loading = false;
 
-  // AuthService stores the JWT under the key 'auth_token'. Retrieve the same.
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
+    return prefs.getString('token') ?? prefs.getString('auth_token');
   }
 
   Future<void> _sendMessage(String text) async {
@@ -36,7 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final token = await _getToken();
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:8000/agent/chat'),
+        Uri.parse('${ApiConfig.baseUrl}/agent/chat'),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
@@ -53,15 +59,15 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _messages.add(agentMsg));
       } else {
         setState(() => _messages.add(_Message(
-          sender: Sender.system,
-          text: 'Error: ${response.statusCode}',
-        )));
+              sender: Sender.system,
+              text: 'Error: ${response.statusCode} ${response.body}',
+            )));
       }
     } catch (e) {
       setState(() => _messages.add(_Message(
-        sender: Sender.system,
-        text: 'Error: Could not reach the WAY Transit Agent.',
-      )));
+            sender: Sender.system,
+            text: 'Error: Could not reach the WAY Transit Agent ($e).',
+          )));
     } finally {
       setState(() => _loading = false);
     }
@@ -97,9 +103,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     ? Colors.white
                     : Colors.black;
                 return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: bgColor,
@@ -112,7 +120,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text('🤖 ${msg.agentName}',
-                                style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.black54)),
                           ),
                         Text(msg.text, style: TextStyle(color: textColor)),
                       ],
@@ -125,7 +134,8 @@ class _ChatScreenState extends State<ChatScreen> {
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(8.0),
-              child: Text('Agent is typing...', style: TextStyle(fontStyle: FontStyle.italic)),
+              child: Text('Agent is typing...',
+                  style: TextStyle(fontStyle: FontStyle.italic)),
             ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -144,7 +154,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  onPressed: _loading ? null : () => _sendMessage(_controller.text),
+                  onPressed:
+                      _loading ? null : () => _sendMessage(_controller.text),
                 ),
               ],
             ),

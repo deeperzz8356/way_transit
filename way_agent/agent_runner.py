@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from langchain_core.messages import AIMessage
-
-from llm_client import get_llm
-from prompts import AGENT_SPECS, build_agent_prompt, latest_user_text
+from prompts import AGENT_SPECS, latest_user_text
 
 
 def _fallback_response(agent_name: str, state: dict) -> str:
@@ -25,7 +22,8 @@ def _fallback_response(agent_name: str, state: dict) -> str:
         )
     if agent_name == "Ticketing Agent":
         return (
-            "Ticketing Agent: I can help with fares, passes, recharge, bookings, or refunds. "
+            "Ticketing Agent: I can list your unified wallet by platform (rail/metro/bus/cab), "
+            "show ticket numbers, or start a journey from a saved ticket. "
             "I will never ask for OTP, UPI PIN, CVV, or card details."
         )
     if agent_name == "Tourist Agent":
@@ -51,11 +49,7 @@ def _fallback_response(agent_name: str, state: dict) -> str:
 
 
 def run_agent(agent_name: str, state: dict) -> dict:
-    try:
-        chain = build_agent_prompt(agent_name) | get_llm()
-        response = chain.invoke({"messages": state.get("messages", [])})
-        content = getattr(response, "content", str(response))
-    except Exception:
-        content = _fallback_response(agent_name, state)
+    from agent_utils import run_enriched_agent
 
-    return {"messages": [AIMessage(content=content)]}
+    enable_web = agent_name != "Ticketing Agent"
+    return run_enriched_agent(agent_name, state, enable_web_search=enable_web)

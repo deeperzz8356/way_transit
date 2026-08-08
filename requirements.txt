@@ -10,13 +10,11 @@ python-multipart==0.0.6
 python-dotenv==1.0.0
 Pillow>=10.0.0
 groq
-# OCR engines (primary → fallback → last resort):
-# 1. Groq vision — requires GROQ_API_KEY in .env
-# 2. Google Cloud Vision — set GOOGLE_VISION_API_KEY (or ADC + google-cloud-vision)
-# 3. Tesseract offline — install system tesseract +: pip install pytesseract
-# pytesseract>=0.3.10
-# google-cloud-vision>=3.0.0
+
+pytesseract>=0.3.10
+google-cloud-vision>=3.0.0
 faiss-cpu
 sentence-transformers
 langchain-community
 langchain-huggingface
+ddgs

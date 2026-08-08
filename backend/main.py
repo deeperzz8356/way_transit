@@ -3,10 +3,9 @@ import os
 
 from dotenv import load_dotenv
 
-# Load repo-root .env before anything else (OCR / Groq)
+# Load repo-root .env (all variables in one place)
 _ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_ROOT / ".env")
-load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

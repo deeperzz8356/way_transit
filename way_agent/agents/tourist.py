@@ -1,10 +1,5 @@
-from langchain_core.messages import AIMessage
-from prompts import build_agent_prompt
-from llm_client import get_llm
+from agent_utils import run_enriched_agent
+
 
 def tourist_node(state: dict) -> dict:
-    prompt = build_agent_prompt("Tourist Agent")
-    llm = get_llm()
-    chain = prompt | llm
-    response = chain.invoke(state)
-    return {"messages": [response]}
+    return run_enriched_agent("Tourist Agent", state)

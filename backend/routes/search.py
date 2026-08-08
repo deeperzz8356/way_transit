@@ -61,3 +61,27 @@ def get_route_path(route_id: int, db: Session = Depends(get_db)):
         mode=route.mode,
         stops=stops_response
     )
+
+
+@router.get("/stops")
+def search_stops(q: str, db: Session = Depends(get_db)):
+    """Fuzzy find stops by name for map markers."""
+    if not q or not q.strip():
+        return []
+    stops = (
+        db.query(models.Stop)
+        .filter(models.Stop.name.ilike(f"%{q.strip()}%"))
+        .limit(8)
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "lat": s.lat,
+            "lon": s.lon,
+            "mode": s.mode,
+        }
+        for s in stops
+        if s.lat is not None and s.lon is not None
+    ]

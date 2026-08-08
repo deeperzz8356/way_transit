@@ -1,5 +1,6 @@
 from typing import Annotated, Sequence, TypedDict
 import operator
+from typing_extensions import NotRequired
 from langchain_core.messages import BaseMessage
 from langgraph.graph import StateGraph, END
 
@@ -15,7 +16,8 @@ from agents.qa_agent import qa_node
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     next: str
-    db_context: str
+    db_context: NotRequired[str]
+    user_id: NotRequired[int]
 
 
 # Build the Graph

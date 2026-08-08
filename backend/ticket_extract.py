@@ -16,7 +16,6 @@ try:
 
     _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     load_dotenv(os.path.join(_root, ".env"))
-    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 except Exception:
     pass
 
@@ -54,15 +53,18 @@ def _ocr_with_groq_vision(image_path: str) -> Optional[str]:
                             "type": "text",
                             "text": (
                                 "Read the transit ticket in the image carefully. "
-                                "Extract the real origin and destination station names printed on it. "
+                                "Extract the real origin, destination, ticket/UTS/PNR number, and operator. "
                                 "Output ONLY these lines, using the real values from the image. "
                                 "If a value is not visible, omit that line entirely. "
                                 "Do NOT output angle brackets, placeholders, or the words station/name/date alone.\n"
                                 "From: \n"
                                 "To: \n"
+                                "TicketNumber: \n"
                                 "Operator: \n"
-                                "Date: "
-                            ),
+                                "Date: \n"
+                                "Mode: rail|metro|bus|cab|other\n"
+                                "Class: \n"
+                                "Fare: "                            ),
                         },
                         {
                             "type": "image_url",
@@ -230,7 +232,9 @@ def _first_match(patterns: list[str], text: str) -> Optional[str]:
 
 
 def parse_ticket_text(text: str) -> dict:
-    """Parse source/destination/operator/date from OCR or vision text."""
+    """Parse source/destination/operator/date/ticket number from OCR or vision text."""
+    from platform_colors import infer_mode_from_operator, normalize_mode
+
     cleaned = text.replace("\r", "\n")
     source = _first_match(
         [
@@ -249,7 +253,8 @@ def parse_ticket_text(text: str) -> dict:
     operator = _first_match(
         [
             r"(?:operator|agency|carrier|service)\s*[:\-]\s*(.+)",
-            r"\b(IRCTC|Indian Railways|Metro|BMTC|DTC|BEST|Uber|Ola)\b",
+            r"\b(IRCTC|Indian Railways|Western Railway|Central Railway|Harbour|Metro|BMTC|DTC|BEST|Uber|Ola)\b",
+            r"\b(ATVM[-\s]?Generated)\b",
         ],
         cleaned,
     )
@@ -261,8 +266,33 @@ def parse_ticket_text(text: str) -> dict:
         ],
         cleaned,
     )
+    ticket_number = _first_match(
+        [
+            r"(?:ticket\s*(?:no|number|#)|uts|pnr|booking\s*id|ticketnumber)\s*[:\-]?\s*([A-Za-z0-9\-/]{4,40})",
+            r"\b(?:UTS|PNR)[\s:#\-]*([A-Za-z0-9\-/]{4,40})\b",
+            r"\b([0-9]{8,16})\b",
+        ],
+        cleaned,
+    )
+    mode_raw = _first_match(
+        [r"(?:mode|platform)\s*[:\-]\s*(rail|metro|bus|cab|other)"],
+        cleaned,
+    )
+    class_name = _first_match(
+        [
+            r"(?:class)\s*[:\-]\s*(.+)",
+            r"\b(I{1,3}\s*ORD|II\s*ORD|I\s*ORD|FIRST|SECOND)\b",
+        ],
+        cleaned,
+    )
+    fare_raw = _first_match(
+        [
+            r"(?:fare|amount|rs\.?|₹)\s*[:\-]?\s*([0-9]+(?:\.[0-9]+)?)",
+        ],
+        cleaned,
+    )
 
-    # Fallback: "A to B" on a single line
+    # Fallback: "A to B" / "A TO B" on a single line (common on ATVM tickets)
     if not source or not destination:
         for line in cleaned.splitlines():
             line = line.strip()
@@ -276,13 +306,56 @@ def parse_ticket_text(text: str) -> dict:
                 destination = destination or _clean_field(m.group(2))
                 break
 
+    operator_clean = _clean_field(operator)
+    mode = normalize_mode(mode_raw) if mode_raw else infer_mode_from_operator(operator_clean, cleaned)
+    fare = None
+    if fare_raw:
+        try:
+            fare = float(fare_raw)
+        except ValueError:
+            fare = None
+
     return {
         "source": _clean_field(source),
         "destination": _clean_field(destination),
-        "operator": _clean_field(operator),
+        "operator": operator_clean,
         "travel_date": _clean_field(travel_date),
+        "ticket_number": _clean_field(ticket_number),
+        "mode": mode,
+        "class_name": _clean_field(class_name),
+        "fare": fare,
+        "qr_payload": None,
         "raw_text": cleaned[:4000] if cleaned else None,
     }
+
+
+def _decode_qr_from_image(image_path: str) -> Optional[str]:
+    """Best-effort QR decode; skip silently if libs unavailable."""
+    try:
+        from PIL import Image
+        from pyzbar.pyzbar import decode as zbar_decode
+
+        img = Image.open(image_path)
+        results = zbar_decode(img)
+        for r in results:
+            data = r.data.decode("utf-8", errors="ignore").strip()
+            if data:
+                return data
+    except Exception:
+        pass
+    try:
+        import cv2
+
+        img = cv2.imread(image_path)
+        if img is None:
+            return None
+        detector = cv2.QRCodeDetector()
+        data, _, _ = detector.detectAndDecode(img)
+        if data and data.strip():
+            return data.strip()
+    except Exception:
+        pass
+    return None
 
 
 def extract_ticket_info(image_path: str) -> dict:
@@ -317,17 +390,28 @@ def extract_ticket_info(image_path: str) -> dict:
         if _LAST_TESSERACT_ERROR:
             details.append(f"Tesseract: {_LAST_TESSERACT_ERROR}")
         hint = "; ".join(details) if details else "no engines available"
+        qr_payload = _decode_qr_from_image(image_path)
         return {
             "source": None,
             "destination": None,
             "operator": None,
             "travel_date": None,
+            "ticket_number": None,
+            "mode": None,
+            "class_name": None,
+            "fare": None,
+            "qr_payload": qr_payload,
             "raw_text": None,
             "ocr_engine": None,
             "message": f"OCR failed ({hint}). Enter stations manually.",
         }
 
     parsed = parse_ticket_text(text)
+    qr_payload = _decode_qr_from_image(image_path)
+    if qr_payload:
+        parsed["qr_payload"] = qr_payload
+        if not parsed.get("ticket_number"):
+            parsed["ticket_number"] = qr_payload[:40]
     parsed["ocr_engine"] = engine
     parsed["message"] = f"Fields extracted via {engine}; review before saving."
     return parsed

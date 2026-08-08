@@ -18,8 +18,12 @@ class AddTicketScreen extends StatefulWidget {
 class _AddTicketScreenState extends State<AddTicketScreen> {
   final _sourceController = TextEditingController();
   final _destinationController = TextEditingController();
+  final _ticketNumberController = TextEditingController();
+  final _qrPayloadController = TextEditingController();
+  final _operatorController = TextEditingController();
   final _api = ApiService();
 
+  String _mode = 'other';
   Uint8List? _imageBytes;
   String? _imageFilename;
   String? _uploadedImageUrl;
@@ -31,11 +35,16 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   String? _error;
   StreamSubscription<Map<String, dynamic>>? _eventsSub;
 
+  static const _modes = ['rail', 'metro', 'bus', 'cab', 'other'];
+
   @override
   void dispose() {
     _eventsSub?.cancel();
     _sourceController.dispose();
     _destinationController.dispose();
+    _ticketNumberController.dispose();
+    _qrPayloadController.dispose();
+    _operatorController.dispose();
     super.dispose();
   }
 
@@ -43,6 +52,11 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     _api.setToken(token ?? 'dev-token');
+  }
+
+  Color _modeColor(String mode) {
+    final hex = PlatformColors.forMode(mode).replaceFirst('#', '');
+    return Color(int.parse('FF$hex', radix: 16));
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -74,9 +88,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
 
     try {
       await _ensureAuth();
-      setState(() {
-        _liveTail.add('Uploading ticket image…');
-      });
+      setState(() => _liveTail.add('Uploading ticket image…'));
 
       final upload = await _api.uploadTicketImageBytes(
         bytes: _imageBytes!,
@@ -102,9 +114,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
         },
         onDone: () {
           if (!mounted) return;
-          if (_isScanning) {
-            _pollJobFallback(upload.jobId);
-          }
+          if (_isScanning) _pollJobFallback(upload.jobId);
         },
       );
     } catch (e) {
@@ -117,20 +127,37 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
     }
   }
 
-  String? _usableStation(String? value) {
+  String? _usable(String? value) {
     if (value == null) return null;
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null;
     final lower = trimmed.toLowerCase();
     if (trimmed.startsWith('<') && trimmed.endsWith('>')) return null;
-    if (lower == 'station' ||
-        lower == '<station>' ||
-        lower == 'unknown' ||
-        lower == 'n/a' ||
-        lower == 'none') {
+    if (['station', '<station>', 'unknown', 'n/a', 'none'].contains(lower)) {
       return null;
     }
     return trimmed;
+  }
+
+  void _applyExtracted(Map<String, dynamic> data) {
+    final source = _usable(data['source']?.toString());
+    final destination = _usable(data['destination']?.toString());
+    final ticketNumber = _usable(data['ticket_number']?.toString());
+    final qr = _usable(data['qr_payload']?.toString());
+    final operator = _usable(data['operator']?.toString());
+    final mode = data['mode']?.toString().toLowerCase();
+
+    if (source != null) _sourceController.text = source;
+    if (destination != null) _destinationController.text = destination;
+    if (ticketNumber != null) _ticketNumberController.text = ticketNumber;
+    if (qr != null) _qrPayloadController.text = qr;
+    if (operator != null) _operatorController.text = operator;
+    if (mode != null && _modes.contains(mode)) _mode = mode;
+
+    if (_usable(_sourceController.text) != null &&
+        _usable(_destinationController.text) != null) {
+      _generateTextMap(_sourceController.text, _destinationController.text);
+    }
   }
 
   void _onLiveEvent(Map<String, dynamic> event) {
@@ -141,22 +168,11 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
       _liveTail.add(message != null ? '[$name] $message' : '[$name]');
     });
 
-    if (name == 'extracted' || name == 'ready') {
-      final source = _usableStation(event['source']?.toString());
-      final destination = _usableStation(event['destination']?.toString());
-      if (source != null) {
-        _sourceController.text = source;
-      }
-      if (destination != null) {
-        _destinationController.text = destination;
-      }
-      if (_sourceController.text.isNotEmpty &&
-          _destinationController.text.isNotEmpty &&
-          _usableStation(_sourceController.text) != null &&
-          _usableStation(_destinationController.text) != null) {
-        _generateTextMap(_sourceController.text, _destinationController.text);
-      }
-      setState(() => _isScanning = false);
+    if (name == 'extracted' || name == 'ready' || name == 'qr_decoded') {
+      setState(() {
+        _applyExtracted(event);
+        if (name != 'qr_decoded') _isScanning = false;
+      });
     }
 
     if (name == 'error') {
@@ -168,10 +184,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
 
     if (name == 'done' || name == 'timeout') {
       setState(() => _isScanning = false);
-      if (_jobId != null &&
-          (_sourceController.text.isEmpty || _destinationController.text.isEmpty)) {
-        _pollJobFallback(_jobId!);
-      }
+      if (_jobId != null) _pollJobFallback(_jobId!);
     }
   }
 
@@ -180,22 +193,11 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
       await _ensureAuth();
       final job = await _api.getTicketJob(jobId);
       if (!mounted) return;
-      final source = _usableStation(job['source']?.toString());
-      final destination = _usableStation(job['destination']?.toString());
       setState(() {
-        if (source != null) {
-          _sourceController.text = source;
-        }
-        if (destination != null) {
-          _destinationController.text = destination;
-        }
+        _applyExtracted(job);
         _isScanning = false;
         _liveTail.add('Synced job status: ${job['status']}');
       });
-      if (_usableStation(_sourceController.text) != null &&
-          _usableStation(_destinationController.text) != null) {
-        _generateTextMap(_sourceController.text, _destinationController.text);
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -206,25 +208,23 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   }
 
   void _generateTextMap(String src, String dest) {
+    final c = _modeColor(_mode);
     setState(() {
       _transitMap = [
         {
           'id': 1,
-          'type': 'walk',
           'label': 'Walk to $src',
           'icon': Icons.directions_walk,
           'color': Colors.amber,
         },
         {
           'id': 2,
-          'type': 'transit',
-          'label': 'Take transit toward $dest',
+          'label': 'Take ${_mode.toUpperCase()} toward $dest',
           'icon': Icons.train,
-          'color': Colors.red,
+          'color': c,
         },
         {
           'id': 3,
-          'type': 'transit',
           'label': 'Arrive at $dest',
           'icon': Icons.location_on,
           'color': Colors.blue,
@@ -234,7 +234,8 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   }
 
   void _handleManualEntry() {
-    if (_sourceController.text.isNotEmpty && _destinationController.text.isNotEmpty) {
+    if (_sourceController.text.isNotEmpty &&
+        _destinationController.text.isNotEmpty) {
       _generateTextMap(_sourceController.text, _destinationController.text);
     }
   }
@@ -254,17 +255,30 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
 
     try {
       await _ensureAuth();
+      final ticketNumber = _ticketNumberController.text.trim();
+      final qrPayload = _qrPayloadController.text.trim();
+      final operator = _operatorController.text.trim();
+
       if (_jobId != null) {
         await _api.confirmTicketJob(
           jobId: _jobId!,
           source: source,
           destination: destination,
+          operator: operator.isEmpty ? null : operator,
+          ticketNumber: ticketNumber.isEmpty ? null : ticketNumber,
+          qrPayload: qrPayload.isEmpty ? null : qrPayload,
+          mode: _mode,
         );
       } else {
         await _api.addTicket(
           source: source,
           destination: destination,
           imageUrl: _uploadedImageUrl,
+          ticketNumber: ticketNumber.isEmpty ? null : ticketNumber,
+          qrPayload: qrPayload.isEmpty ? null : qrPayload,
+          mode: _mode,
+          operatorName: operator.isEmpty ? null : operator,
+          sourceType: 'manual',
         );
       }
 
@@ -275,58 +289,65 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
       setState(() {
         _sourceController.clear();
         _destinationController.clear();
+        _ticketNumberController.clear();
+        _qrPayloadController.clear();
+        _operatorController.clear();
         _imageBytes = null;
         _imageFilename = null;
         _uploadedImageUrl = null;
         _jobId = null;
         _transitMap = null;
         _liveTail.clear();
+        _mode = 'other';
+        _isSaving = false;
       });
     } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().contains('Already in wallet')
+            ? 'Already in wallet'
+            : e.toString();
+        _isSaving = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final accent = _modeColor(_mode);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Ticket / Pass'),
+        backgroundColor: accent,
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
               'Take a photo of your physical ticket or enter it manually to add it to your wallet.',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(color: Colors.black54),
             ),
-            const SizedBox(height: 24),
-            if (_error != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                color: Colors.red[100],
-                margin: const EdgeInsets.only(bottom: 16),
-                child: Text(_error!, style: const TextStyle(color: Colors.red)),
-              ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+            const SizedBox(height: 16),
             Card(
-              elevation: 2,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    const Text(
-                      'Quick Photo Scanner',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
+                    const Text('Quick Photo Scanner',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton.icon(
+                          child: OutlinedButton.icon(
                             onPressed: _isScanning
                                 ? null
                                 : () => _pickImage(ImageSource.camera),
@@ -336,7 +357,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton.icon(
+                          child: OutlinedButton.icon(
                             onPressed: _isScanning
                                 ? null
                                 : () => _pickImage(ImageSource.gallery),
@@ -346,73 +367,50 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                         ),
                       ],
                     ),
-                    if (_isScanning)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 16.0),
-                        child: Column(
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 8),
-                            Text(
-                              'Processing ticket…',
-                              style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: Colors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
+                    if (_imageBytes != null) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(_imageBytes!, height: 160,
+                            fit: BoxFit.cover),
                       ),
-                    if (_imageBytes != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Image.memory(
-                          _imageBytes!,
-                          height: 150,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                    ],
                     if (_uploadedImageUrl != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
+                        padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           'Stored: ${ApiConfig.resolveUrl(_uploadedImageUrl!)}',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.black45),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    if (_liveTail.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Live processing',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                    if (_isScanning || _liveTail.isNotEmpty) ...[
+                      const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
-                        constraints: const BoxConstraints(maxHeight: 160),
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF111827),
+                          color: Colors.black87,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _liveTail.length,
-                          itemBuilder: (context, index) {
-                            return Text(
-                              _liveTail[index],
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 12,
-                                color: Color(0xFFD1FAE5),
-                              ),
-                            );
-                          },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Live processing',
+                                style: TextStyle(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            ..._liveTail.map(
+                              (l) => Text(l,
+                                  style: const TextStyle(
+                                      color: Colors.greenAccent,
+                                      fontFamily: 'monospace',
+                                      fontSize: 12)),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -421,24 +419,20 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24.0),
+              padding: EdgeInsets.symmetric(vertical: 20),
               child: Center(
-                child: Text(
-                  'OR',
-                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-                ),
-              ),
+                  child: Text('OR',
+                      style: TextStyle(
+                          color: Colors.grey, fontWeight: FontWeight.bold))),
             ),
             Card(
-              elevation: 2,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    const Text(
-                      'Manual Entry',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+                    const Text('Manual Entry',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _sourceController,
@@ -447,7 +441,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _destinationController,
                       decoration: const InputDecoration(
@@ -455,8 +449,56 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _ticketNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Ticket Number / UTS / PNR',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _qrPayloadController,
+                      decoration: const InputDecoration(
+                        labelText: 'QR Payload (paste or from scan)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _operatorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Operator',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(_mode),
+                      initialValue: _mode,
+                      decoration: const InputDecoration(
+                        labelText: 'Platform',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _modes
+                          .map((m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(m.toUpperCase()),
+                              ))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setState(() => _mode = v);
+                        if (_sourceController.text.isNotEmpty &&
+                            _destinationController.text.isNotEmpty) {
+                          _generateTextMap(_sourceController.text,
+                              _destinationController.text);
+                        }
+                      },
+                    ),
                     const SizedBox(height: 16),
-                    ElevatedButton(
+                    OutlinedButton(
                       onPressed: _handleManualEntry,
                       child: const Text('Show Route Map'),
                     ),
@@ -466,45 +508,36 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
             ),
             if (_transitMap != null)
               Padding(
-                padding: const EdgeInsets.only(top: 24.0),
+                padding: const EdgeInsets.only(top: 24),
                 child: Card(
-                  elevation: 2,
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'Active Transit Route',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
+                        const Text('Active Transit Route',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
                         ..._transitMap!.map((step) {
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
+                            padding: const EdgeInsets.only(bottom: 16),
                             child: Row(
                               children: [
                                 CircleAvatar(
                                   backgroundColor: step['color'] as Color,
                                   radius: 16,
-                                  child: Icon(
-                                    step['icon'] as IconData,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
+                                  child: Icon(step['icon'] as IconData,
+                                      size: 16, color: Colors.white),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  child: Text(
-                                    step['label'] as String,
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                ),
+                                    child: Text(step['label'] as String,
+                                        style: const TextStyle(fontSize: 16))),
                               ],
                             ),
                           );
                         }),
-                        const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _isSaving ? null : _saveTicket,
                           style: ElevatedButton.styleFrom(
@@ -515,9 +548,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                           child: Text(
                             _isSaving ? 'Saving…' : 'Save to Wallet',
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                                fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],

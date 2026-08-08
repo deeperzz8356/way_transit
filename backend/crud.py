@@ -48,31 +48,327 @@ def create_booking(db: Session, user_id: int, route_id: int):
     return booking
 
 import uuid
+from datetime import datetime, timedelta, date
+from typing import Optional
 
-def create_unified_ticket(db: Session, user_id: int, source: str, destination: str, image_url: str = None):
-    """Create a wallet ticket linked to a lightweight route so source/destination persist."""
-    route = models.Route(
-        name=f"{source} to {destination}",
-        mode="transit",
-        is_active=True,
+from platform_colors import normalize_mode, infer_mode_from_operator
+
+
+def find_duplicate_ticket(
+    db: Session,
+    user_id: int,
+    ticket_number: Optional[str],
+    mode: Optional[str],
+):
+    if not ticket_number or not ticket_number.strip():
+        return None
+    mode_n = normalize_mode(mode)
+    return (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.user_id == user_id,
+            models.Booking.ticket_number == ticket_number.strip(),
+            models.Booking.mode == mode_n,
+        )
+        .first()
     )
-    db.add(route)
-    db.flush()
+
+
+def _parse_travel_date(value: Optional[str]):
+    if not value:
+        return None
+    raw = value.strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y"):
+        try:
+            return datetime.strptime(raw[:10], fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def create_unified_ticket(
+    db: Session,
+    user_id: int,
+    source: str,
+    destination: str,
+    image_url: str = None,
+    ticket_number: str = None,
+    qr_payload: str = None,
+    mode: str = None,
+    operator_name: str = None,
+    travel_date: str = None,
+    class_name: str = None,
+    fare: float = None,
+    source_type: str = "manual",
+    operator_id: int = None,
+):
+    """Create a wallet ticket with actual ticket identity fields."""
+    mode_n = normalize_mode(mode) if mode else infer_mode_from_operator(operator_name)
 
     ticket_code = str(uuid.uuid4())
     booking = models.Booking(
         user_id=user_id,
-        route_id=route.id,
+        route_id=None,
         status="CONFIRMED",
         ticket_code=ticket_code,
+        ticket_number=(ticket_number or "").strip() or None,
+        qr_payload=(qr_payload or "").strip() or None,
+        mode=mode_n,
+        operator_id=operator_id,
+        operator_name=operator_name,
+        class_name=class_name,
+        fare=fare,
+        source_type=source_type or "manual",
         image_url=image_url,
         source=source,
         destination=destination,
+        travel_date=_parse_travel_date(travel_date) if isinstance(travel_date, str) else travel_date,
     )
     db.add(booking)
     db.commit()
     db.refresh(booking)
     return booking
+
+
+def find_stop_by_name(db: Session, name: str):
+    if not name:
+        return None
+    return (
+        db.query(models.Stop)
+        .filter(models.Stop.name.ilike(f"%{name.strip()}%"))
+        .first()
+    )
+
+
+def _parse_datetime(value: Optional[str]):
+    if not value:
+        return None
+    raw = value.strip()
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(raw[:19], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def deactivate_other_active_tickets(db: Session, user_id: int, keep_booking_id: int):
+    """Only one ticket can be the auto-active journey at a time."""
+    others = (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.user_id == user_id,
+            models.Booking.status == "IN_PROGRESS",
+            models.Booking.id != keep_booking_id,
+        )
+        .all()
+    )
+    for other in others:
+        other.status = "CONFIRMED"
+        other.journey_started_at = None
+        other.journey_estimated_end_at = None
+        db.add(other)
+        for j in (
+            db.query(models.Journey)
+            .filter(
+                models.Journey.booking_id == other.id,
+                models.Journey.status == "active",
+            )
+            .all()
+        ):
+            j.status = "superseded"
+            db.add(j)
+
+
+def start_journey_for_ticket(
+    db: Session,
+    user_id: int,
+    booking_id: int,
+    start_time: Optional[str] = None,
+    estimated_end_time: Optional[str] = None,
+    make_active: bool = True,
+):
+    booking = (
+        db.query(models.Booking)
+        .filter(models.Booking.id == booking_id, models.Booking.user_id == user_id)
+        .first()
+    )
+    if not booking:
+        return None, "Ticket not found"
+    if booking.status == "USED":
+        return None, "Ticket already used"
+    if booking.status == "EXPIRED":
+        return None, "Ticket expired"
+
+    started = _parse_datetime(start_time) or datetime.utcnow()
+    estimated_end = _parse_datetime(estimated_end_time)
+    if estimated_end and estimated_end <= started:
+        return None, "Estimated end time must be after start time"
+
+    if make_active:
+        deactivate_other_active_tickets(db, user_id, booking.id)
+
+    from_stop = find_stop_by_name(db, booking.source)
+    to_stop = find_stop_by_name(db, booking.destination)
+    duration_min = None
+    if estimated_end:
+        duration_min = int((estimated_end - started).total_seconds() // 60)
+
+    journey = models.Journey(
+        user_id=user_id,
+        booking_id=booking.id,
+        from_stop_id=from_stop.id if from_stop else None,
+        to_stop_id=to_stop.id if to_stop else None,
+        total_fare=booking.fare,
+        total_duration=duration_min,
+        status="active",
+        started_at=started,
+        estimated_end_at=estimated_end,
+    )
+    booking.status = "IN_PROGRESS"
+    booking.journey_started_at = started
+    booking.journey_estimated_end_at = estimated_end
+    db.add(journey)
+    db.add(booking)
+    db.commit()
+    db.refresh(journey)
+    db.refresh(booking)
+    return journey, None
+
+
+def delete_ticket(db: Session, user_id: int, booking_id: int):
+    booking = (
+        db.query(models.Booking)
+        .filter(models.Booking.id == booking_id, models.Booking.user_id == user_id)
+        .first()
+    )
+    if not booking:
+        return False, "Ticket not found"
+    # Clear ingest job links
+    jobs = (
+        db.query(models.TicketIngestJob)
+        .filter(models.TicketIngestJob.booking_id == booking.id)
+        .all()
+    )
+    for job in jobs:
+        job.booking_id = None
+        db.add(job)
+    # Remove related journeys
+    for j in (
+        db.query(models.Journey).filter(models.Journey.booking_id == booking.id).all()
+    ):
+        db.delete(j)
+    # Remove reward points tied to booking if any
+    for rp in (
+        db.query(models.RewardPoint)
+        .filter(models.RewardPoint.booking_id == booking.id)
+        .all()
+    ):
+        db.delete(rp)
+    db.delete(booking)
+    db.commit()
+    return True, None
+
+
+def complete_ticket_journey(db: Session, user_id: int, booking_id: int):
+    booking = (
+        db.query(models.Booking)
+        .filter(models.Booking.id == booking_id, models.Booking.user_id == user_id)
+        .first()
+    )
+    if not booking:
+        return None, "Ticket not found"
+    booking.status = "USED"
+    booking.journey_started_at = booking.journey_started_at
+    booking.journey_estimated_end_at = booking.journey_estimated_end_at
+    active = (
+        db.query(models.Journey)
+        .filter(
+            models.Journey.booking_id == booking.id,
+            models.Journey.status == "active",
+        )
+        .all()
+    )
+    for j in active:
+        j.status = "completed"
+        db.add(j)
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return booking, None
+
+
+def get_user_wallet(db: Session, user_id: int, mode: Optional[str] = None):
+    q = db.query(models.Booking).filter(models.Booking.user_id == user_id)
+    if mode and mode != "all":
+        q = q.filter(models.Booking.mode == normalize_mode(mode))
+    tickets = q.order_by(models.Booking.booked_at.desc()).all()
+    # Expire dated tickets
+    today = date.today()
+    for t in tickets:
+        if (
+            t.travel_date
+            and t.travel_date < today
+            and t.status in ("CONFIRMED", "IN_PROGRESS")
+        ):
+            t.status = "EXPIRED"
+            db.add(t)
+    db.commit()
+
+    passes = (
+        db.query(models.UserPass)
+        .filter(models.UserPass.user_id == user_id)
+        .order_by(models.UserPass.created_at.desc())
+        .all()
+    )
+    return tickets, passes
+
+
+def ensure_demo_pass_products(db: Session):
+    """Seed a couple of pass products if none exist."""
+    if db.query(models.Pass).count() > 0:
+        return
+    op = db.query(models.Operator).first()
+    op_id = op.id if op else None
+    for name, days, price, mode in [
+        ("Daily Suburban Pass", 1, 50.0, "rail"),
+        ("Metro Day Pass", 1, 80.0, "metro"),
+        ("BEST Day Pass", 1, 40.0, "bus"),
+    ]:
+        db.add(
+            models.Pass(
+                operator_id=op_id,
+                name=name,
+                validity_days=days,
+                price=price,
+                mode_coverage=mode,
+                is_active=True,
+            )
+        )
+    db.commit()
+
+
+def add_user_pass(db: Session, user_id: int, pass_id: int):
+    product = db.query(models.Pass).filter(models.Pass.id == pass_id).first()
+    if not product:
+        return None
+    valid_until = datetime.utcnow() + timedelta(days=product.validity_days or 1)
+    up = models.UserPass(
+        user_id=user_id,
+        pass_id=pass_id,
+        valid_until=valid_until,
+        status="active",
+    )
+    db.add(up)
+    db.commit()
+    db.refresh(up)
+    return up
 
 def create_route(db: Session, source: str, destination: str, transport: str, departure_time: str, arrival_time: str, price: int):
     route = models.Route(

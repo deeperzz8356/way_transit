@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
-import 'ai_helper_screen.dart';
-import 'chat_screen.dart';
 import 'wallet_screen.dart';
 import 'add_ticket_screen.dart';
+import '../nav/app_nav.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,23 +15,44 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const ProfileScreen(),
-    const AddTicketScreen(),
-    const WalletScreen(),
+  final List<Widget> _screens = const [
+    HomeScreen(),
+    ProfileScreen(),
+    AddTicketScreen(),
+    WalletScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    AppNav.tabIndex.addListener(_onTabChanged);
+  }
+
+  @override
+  void dispose() {
+    AppNav.tabIndex.removeListener(_onTabChanged);
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    final next = AppNav.tabIndex.value;
+    if (next != _currentIndex && mounted) {
+      setState(() => _currentIndex = next);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
+          AppNav.tabIndex.value = index;
         },
         items: const [
           BottomNavigationBarItem(

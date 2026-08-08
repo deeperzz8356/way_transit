@@ -1,29 +1,176 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/booking.dart';
+import '../services/api_service.dart';
+import '../nav/app_nav.dart';
+import '../config/api_config.dart';
 import 'map_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _api = ApiService();
+  final _mapController = MapController();
+  Booking? _activeTicket;
+  bool _isLoading = true;
+  LatLng? _fromPoint;
+  LatLng? _toPoint;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchActiveTicket();
+    AppNav.homeRefreshTick.addListener(_onHomeRefresh);
+  }
+
+  @override
+  void dispose() {
+    AppNav.homeRefreshTick.removeListener(_onHomeRefresh);
+    super.dispose();
+  }
+
+  void _onHomeRefresh() {
+    _fetchActiveTicket();
+  }
+
+  Future<void> _fetchActiveTicket() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      _api.setToken(token ?? 'dev-token');
+
+      final bookings = await _api.getMyBookings();
+      if (!mounted) return;
+
+      Booking? active;
+      for (final b in bookings) {
+        if (b.status.toUpperCase() == 'IN_PROGRESS' || b.activeBadge) {
+          active = b;
+          break;
+        }
+      }
+
+      setState(() {
+        _activeTicket = active;
+        _isLoading = false;
+        if (active == null) {
+          _fromPoint = null;
+          _toPoint = null;
+        }
+      });
+
+      if (active != null) {
+        await _resolveMapPoints(active);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _resolveMapPoints(Booking ticket) async {
+    LatLng? from;
+    LatLng? to;
+    try {
+      if (ticket.source != null && ticket.source!.isNotEmpty) {
+        final stops = await _api.searchStops(ticket.source!);
+        if (stops.isNotEmpty) {
+          from = LatLng(
+            (stops.first['lat'] as num).toDouble(),
+            (stops.first['lon'] as num).toDouble(),
+          );
+        }
+      }
+      if (ticket.destination != null && ticket.destination!.isNotEmpty) {
+        final stops = await _api.searchStops(ticket.destination!);
+        if (stops.isNotEmpty) {
+          to = LatLng(
+            (stops.first['lat'] as num).toDouble(),
+            (stops.first['lon'] as num).toDouble(),
+          );
+        }
+      }
+    } catch (_) {}
+
+    // Fallback Mumbai-ish offsets if stops missing
+    from ??= const LatLng(19.2290, 72.8570); // approx Virar-ish NW
+    to ??= const LatLng(18.9400, 72.8350); // Churchgate-ish
+
+    if (!mounted) return;
+    setState(() {
+      _fromPoint = from;
+      _toPoint = to;
+    });
+
+    try {
+      final bounds = LatLngBounds(from, to);
+      _mapController.fitBounds(
+        bounds,
+        options: const FitBoundsOptions(padding: EdgeInsets.all(48)),
+      );
+    } catch (_) {
+      _mapController.move(
+        LatLng(
+          (from.latitude + to.latitude) / 2,
+          (from.longitude + to.longitude) / 2,
+        ),
+        11,
+      );
+    }
+  }
+
+  Color get _activeColor {
+    final hex = (_activeTicket?.colorHex?.isNotEmpty == true)
+        ? _activeTicket!.colorHex!
+        : PlatformColors.forMode(_activeTicket?.mode);
+    return Color(int.parse('FF${hex.replaceFirst('#', '')}', radix: 16));
+  }
+
+  String _fmt(DateTime? dt) {
+    if (dt == null) return '—';
+    final l = dt.toLocal();
+    return '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildHeader(),
-              _buildMapSearchArea(context),
-              const SizedBox(height: 24),
-              _buildChatCategory(),
-              const SizedBox(height: 24),
-              _buildTravelSavings(),
-              const SizedBox(height: 24),
-              _buildRecommendations(),
-              const SizedBox(height: 24),
-            ],
+        child: RefreshIndicator(
+          onRefresh: _fetchActiveTicket,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                _buildHeader(),
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_activeTicket != null) ...[
+                  _buildActiveBento(),
+                  const SizedBox(height: 16),
+                ],
+                _buildMapSearchArea(context),
+                const SizedBox(height: 24),
+                _buildChatCategory(),
+                const SizedBox(height: 24),
+                _buildTravelSavings(),
+                const SizedBox(height: 24),
+                _buildRecommendations(),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -88,12 +235,209 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildActiveBento() {
+    final t = _activeTicket!;
+    final color = _activeColor;
+    final source = t.source ?? 'Unknown';
+    final destination = t.destination ?? 'Unknown';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'ACTIVE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      (t.modeLabel ?? t.mode ?? 'Transit').toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  '$source → $destination',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (t.ticketNumber != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Ticket ${t.ticketNumber}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _bentoTile(
+                  icon: Icons.schedule,
+                  label: 'Start',
+                  value: _fmt(t.journeyStartedAt),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _bentoTile(
+                  icon: Icons.flag,
+                  label: 'Est. end',
+                  value: _fmt(t.journeyEstimatedEndAt),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _bentoTile(
+                  icon: Icons.confirmation_number_outlined,
+                  label: 'Platform',
+                  value: (t.mode ?? 'other').toUpperCase(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _bentoTile(
+                  icon: Icons.payments_outlined,
+                  label: 'Fare',
+                  value: t.fare != null ? '₹${t.fare!.toStringAsFixed(0)}' : '—',
+                ),
+              ),
+            ],
+          ),
+          if (t.operatorName != null) ...[
+            const SizedBox(height: 10),
+            _bentoTile(
+              icon: Icons.business,
+              label: 'Operator',
+              value: t.operatorName!,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _bentoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: _activeColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.black45)),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMapSearchArea(BuildContext context) {
+    final center = _fromPoint != null && _toPoint != null
+        ? LatLng(
+            (_fromPoint!.latitude + _toPoint!.latitude) / 2,
+            (_fromPoint!.longitude + _toPoint!.longitude) / 2,
+          )
+        : const LatLng(19.0760, 72.8777);
+    final markers = <Marker>[];
+    if (_fromPoint != null) {
+      markers.add(
+        Marker(
+          point: _fromPoint!,
+          width: 40,
+          height: 40,
+          child:
+              const Icon(Icons.trip_origin, color: Colors.green, size: 32),
+        ),
+      );
+    }
+    if (_toPoint != null) {
+      markers.add(
+        Marker(
+          point: _toPoint!,
+          width: 40,
+          height: 40,
+          child: const Icon(Icons.location_on, color: Colors.red, size: 36),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Container(
-            // Increased height for a larger map preview
-            height: 600,
+        height: 320,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
@@ -109,50 +453,68 @@ class HomeScreen extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: FlutterMap(
+                mapController: _mapController,
                 options: MapOptions(
-                  center: const LatLng(19.0760, 72.8777), // Mumbai
-                  zoom: 13,
+                  center: center,
+                  zoom: _activeTicket != null ? 11.0 : 13.0,
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.example.way_mobile',
                   ),
+                  if (_fromPoint != null && _toPoint != null)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: [_fromPoint!, _toPoint!],
+                          color: _activeTicket != null
+                              ? _activeColor
+                              : const Color(0xFF5974FF),
+                          strokeWidth: 4,
+                        ),
+                      ],
+                    ),
+                  MarkerLayer(markers: markers),
                 ],
               ),
             ),
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  '32°C ☀️',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1B35),
+            if (_activeTicket != null)
+              Positioned(
+                top: 12,
+                left: 12,
+                right: 12,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_activeTicket!.source ?? '?'} → ${_activeTicket!.destination ?? '?'}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
-            ),
             Positioned(
               bottom: 16,
               left: 16,
               right: 16,
               child: GestureDetector(
                 onTap: () {
-                    // Navigate to full map screen
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const MapScreen()),
-                    );
-                  },
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MapScreen()),
+                  );
+                },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -165,14 +527,18 @@ class HomeScreen extends StatelessWidget {
                     ],
                   ),
                   child: Row(
-                    children: const [
-                      Text('🔍', style: TextStyle(fontSize: 20)),
-                      SizedBox(width: 12),
-                      Text(
-                        'Where to?',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF8C90A3),
+                    children: [
+                      const Text('🔍', style: TextStyle(fontSize: 20)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _activeTicket != null
+                              ? 'Active trip on map'
+                              : 'Where to?',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF8C90A3),
+                          ),
                         ),
                       ),
                     ],

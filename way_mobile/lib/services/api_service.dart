@@ -135,9 +135,12 @@ class ApiService {
     }
   }
 
-  Future<List<Booking>> getMyBookings() async {
+  Future<List<Booking>> getMyBookings({String? mode}) async {
+    final q = (mode != null && mode.isNotEmpty && mode != 'all')
+        ? '?mode=$mode'
+        : '';
     final response = await http.get(
-      Uri.parse('$_baseUrl${ApiConfig.myBookings}'),
+      Uri.parse('$_baseUrl${ApiConfig.myBookings}$q'),
       headers: _headers,
     );
 
@@ -149,10 +152,32 @@ class ApiService {
     }
   }
 
+  Future<WalletData> getWallet({String? mode}) async {
+    final q = (mode != null && mode.isNotEmpty && mode != 'all')
+        ? '?mode=$mode'
+        : '';
+    final response = await http.get(
+      Uri.parse('$_baseUrl${ApiConfig.wallet}$q'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      return WalletData.fromJson(json.decode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Failed to get wallet: ${response.body}');
+  }
+
   Future<Booking> addTicket({
     required String source,
     required String destination,
     String? imageUrl,
+    String? ticketNumber,
+    String? qrPayload,
+    String? mode,
+    String? operatorName,
+    String? travelDate,
+    String? className,
+    double? fare,
+    String sourceType = 'manual',
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl${ApiConfig.addTicket}'),
@@ -161,11 +186,22 @@ class ApiService {
         'source': source,
         'destination': destination,
         'image_url': imageUrl,
+        'ticket_number': ticketNumber,
+        'qr_payload': qrPayload,
+        'mode': mode,
+        'operator_name': operatorName,
+        'travel_date': travelDate,
+        'class_name': className,
+        'fare': fare,
+        'source_type': sourceType,
       }),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return Booking.fromJson(json.decode(response.body));
+    }
+    if (response.statusCode == 409) {
+      throw Exception('Already in wallet');
     }
     throw Exception('Failed to save ticket: ${response.body}');
   }
@@ -275,6 +311,11 @@ class ApiService {
     required String destination,
     String? operator,
     String? travelDate,
+    String? ticketNumber,
+    String? qrPayload,
+    String? mode,
+    String? className,
+    double? fare,
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl${ApiConfig.ticketJobConfirm(jobId)}'),
@@ -283,13 +324,115 @@ class ApiService {
         'source': source,
         'destination': destination,
         'operator': operator,
+        'operator_name': operator,
         'travel_date': travelDate,
+        'ticket_number': ticketNumber,
+        'qr_payload': qrPayload,
+        'mode': mode,
+        'class_name': className,
+        'fare': fare,
       }),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return Booking.fromJson(json.decode(response.body));
     }
+    if (response.statusCode == 409) {
+      throw Exception('Already in wallet');
+    }
     throw Exception('Failed to confirm ticket: ${response.body}');
+  }
+
+  Future<List<Map<String, dynamic>>> searchStops(String query) async {
+    final response = await http.get(
+      Uri.parse(
+        '$_baseUrl${ApiConfig.searchStops}?q=${Uri.encodeComponent(query)}',
+      ),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  Future<Booking> getTicket(int ticketId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl${ApiConfig.ticketDetail(ticketId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      return Booking.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to load ticket: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> startJourney(
+    int ticketId, {
+    DateTime? startTime,
+    DateTime? estimatedEndTime,
+    bool makeActive = true,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl${ApiConfig.startJourney(ticketId)}'),
+      headers: _headers,
+      body: json.encode({
+        'start_time': startTime?.toUtc().toIso8601String(),
+        'estimated_end_time': estimatedEndTime?.toUtc().toIso8601String(),
+        'make_active': makeActive,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to start journey: ${response.body}');
+  }
+
+  Future<void> deleteTicket(int ticketId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl${ApiConfig.deleteTicket(ticketId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    throw Exception('Failed to delete ticket: ${response.body}');
+  }
+
+  Future<Booking> completeJourney(int ticketId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl${ApiConfig.completeJourney(ticketId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Booking.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to complete journey: ${response.body}');
+  }
+
+  Future<List<UserPassItem>> listPassProducts() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl${ApiConfig.listPasses}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data
+          .map((e) => UserPassItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw Exception('Failed to list passes: ${response.body}');
+  }
+
+  Future<UserPassItem> addPassToWallet(int passId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl${ApiConfig.addPass(passId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return UserPassItem.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to add pass: ${response.body}');
   }
 }

@@ -253,25 +253,37 @@ class Booking(Base):
     __tablename__ = "bookings"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
-    route_id = Column(Integer, ForeignKey("routes.id"), index=True)
+    route_id = Column(Integer, ForeignKey("routes.id"), index=True, nullable=True)
     from_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     to_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     trip_id = Column(Integer, ForeignKey("trips.id"), index=True)
     distance_km = Column(Float)
     image_url = Column(String, nullable=True)
     ticket_code = Column(String, unique=True, index=True)
+    ticket_number = Column(String, nullable=True, index=True)
+    qr_payload = Column(String, nullable=True)
+    mode = Column(String, nullable=True, default="other")  # rail|metro|bus|cab|other
+    operator_id = Column(Integer, ForeignKey("operators.id"), nullable=True, index=True)
+    operator_name = Column(String, nullable=True)
+    class_name = Column(String, nullable=True)
+    fare = Column(Float, nullable=True)
+    source_type = Column(String, nullable=True)  # scan|manual|booked
     source = Column(String, nullable=True)
     destination = Column(String, nullable=True)
     travel_date = Column(Date)
-    status = Column(String, default="CONFIRMED")
+    status = Column(String, default="CONFIRMED")  # CONFIRMED|IN_PROGRESS|USED|EXPIRED
+    journey_started_at = Column(DateTime, nullable=True)
+    journey_estimated_end_at = Column(DateTime, nullable=True)
     booked_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="bookings")
     route = relationship("Route", back_populates="bookings")
+    operator = relationship("Operator")
     departure_stop = relationship("Stop", foreign_keys=[from_stop_id], back_populates="departure_bookings")
     arrival_stop = relationship("Stop", foreign_keys=[to_stop_id], back_populates="arrival_bookings")
     trip = relationship("Trip", back_populates="bookings")
     reward_points = relationship("RewardPoint", back_populates="booking")
+    journeys = relationship("Journey", back_populates="booking")
 
 
 class TicketIngestJob(Base):
@@ -284,6 +296,9 @@ class TicketIngestJob(Base):
     destination = Column(String, nullable=True)
     operator = Column(String, nullable=True)
     travel_date = Column(String, nullable=True)
+    ticket_number = Column(String, nullable=True)
+    qr_payload = Column(String, nullable=True)
+    mode = Column(String, nullable=True)
     raw_text = Column(String, nullable=True)
     error_message = Column(String, nullable=True)
     booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True)
@@ -294,14 +309,19 @@ class Journey(Base):
     __tablename__ = "journeys"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True, index=True)
     from_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     to_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     total_fare = Column(Float)
     total_duration = Column(Integer)
     total_distance = Column(Float)
+    status = Column(String, default="active")  # active|completed|superseded
+    started_at = Column(DateTime, nullable=True)
+    estimated_end_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="journeys")
+    booking = relationship("Booking", back_populates="journeys")
     origin_stop = relationship("Stop", foreign_keys=[from_stop_id], back_populates="journey_origins")
     destination_stop = relationship("Stop", foreign_keys=[to_stop_id], back_populates="journey_destinations")
 
@@ -375,6 +395,21 @@ class Pass(Base):
     is_active = Column(Boolean, default=True)
 
     operator = relationship("Operator", back_populates="passes")
+    user_passes = relationship("UserPass", back_populates="pass_product")
+
+
+class UserPass(Base):
+    __tablename__ = "user_passes"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    pass_id = Column(Integer, ForeignKey("passes.id"), index=True)
+    valid_until = Column(DateTime, nullable=True)
+    status = Column(String, default="active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    pass_product = relationship("Pass", back_populates="user_passes")
+    user = relationship("User")
+
 
 class Concession(Base):
     __tablename__ = "concessions"
