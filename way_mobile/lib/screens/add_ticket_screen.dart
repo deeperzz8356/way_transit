@@ -6,7 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
+import '../models/booking.dart';
 import '../services/api_service.dart';
+import '../widgets/create_trip_sheet.dart';
 
 class AddTicketScreen extends StatefulWidget {
   const AddTicketScreen({super.key});
@@ -35,7 +37,16 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   String? _error;
   StreamSubscription<Map<String, dynamic>>? _eventsSub;
 
+  List<TicketTrip> _trips = [];
+  int? _selectedTripId;
+
   static const _modes = ['rail', 'metro', 'bus', 'cab', 'other'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrips();
+  }
 
   @override
   void dispose() {
@@ -52,6 +63,38 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     _api.setToken(token ?? 'dev-token');
+  }
+
+  Future<void> _loadTrips() async {
+    try {
+      await _ensureAuth();
+      final trips = await _api.listTrips();
+      if (!mounted) return;
+      setState(() => _trips = trips);
+    } catch (_) {
+      // Trips are optional at save time; ignore load failures.
+    }
+  }
+
+  Future<void> _createTripInline() async {
+    final data = await showCreateTripSheet(context);
+    if (data == null || data['name'] == null) return;
+    try {
+      await _ensureAuth();
+      final trip = await _api.createTrip(
+        name: data['name']!,
+        notes: data['notes'],
+        travelDate: data['travelDate'],
+      );
+      if (!mounted) return;
+      setState(() {
+        _trips = [trip, ..._trips];
+        _selectedTripId = trip.id;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   Color _modeColor(String mode) {
@@ -276,6 +319,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
           ticketNumber: ticketNumber.isEmpty ? null : ticketNumber,
           qrPayload: qrPayload.isEmpty ? null : qrPayload,
           mode: _mode,
+          ticketTripId: _selectedTripId,
         );
       } else {
         await _api.addTicket(
@@ -287,6 +331,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
           mode: _mode,
           operatorName: operator.isEmpty ? null : operator,
           sourceType: 'manual',
+          ticketTripId: _selectedTripId,
         );
       }
 
@@ -307,6 +352,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
         _transitMap = null;
         _liveTail.clear();
         _mode = 'other';
+        _selectedTripId = null;
         _isSaving = false;
       });
     } catch (e) {
@@ -565,6 +611,35 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                             ),
                           );
                         }),
+                        DropdownButtonFormField<int?>(
+                          value: _selectedTripId,
+                          decoration: const InputDecoration(
+                            labelText: 'Add to trip (optional)',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('No trip — keep ungrouped'),
+                            ),
+                            ..._trips.map(
+                              (t) => DropdownMenuItem<int?>(
+                                value: t.id,
+                                child: Text(t.name),
+                              ),
+                            ),
+                          ],
+                          onChanged: (v) => setState(() => _selectedTripId = v),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _createTripInline,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('New trip'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         ElevatedButton(
                           onPressed: _isSaving ? null : _saveTicket,
                           style: ElevatedButton.styleFrom(

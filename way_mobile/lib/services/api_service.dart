@@ -234,6 +234,7 @@ class ApiService {
     String? className,
     double? fare,
     String sourceType = 'manual',
+    int? ticketTripId,
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl${ApiConfig.addTicket}'),
@@ -250,6 +251,7 @@ class ApiService {
         'class_name': className,
         'fare': fare,
         'source_type': sourceType,
+        if (ticketTripId != null) 'ticket_trip_id': ticketTripId,
       }),
     );
 
@@ -372,6 +374,7 @@ class ApiService {
     String? mode,
     String? className,
     double? fare,
+    int? ticketTripId,
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl${ApiConfig.ticketJobConfirm(jobId)}'),
@@ -387,6 +390,7 @@ class ApiService {
         'mode': mode,
         'class_name': className,
         'fare': fare,
+        if (ticketTripId != null) 'ticket_trip_id': ticketTripId,
       }),
     );
 
@@ -490,5 +494,105 @@ class ApiService {
       return UserPassItem.fromJson(json.decode(response.body));
     }
     throw Exception('Failed to add pass: ${response.body}');
+  }
+
+  Future<List<TicketTrip>> listTrips() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl${ApiConfig.trips}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data
+          .map((e) => TicketTrip.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw Exception('Failed to list trips: ${response.body}');
+  }
+
+  Future<TicketTrip> createTrip({
+    required String name,
+    String? notes,
+    String? travelDate,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl${ApiConfig.trips}'),
+      headers: _headers,
+      body: json.encode({
+        'name': name,
+        if (notes != null) 'notes': notes,
+        if (travelDate != null) 'travel_date': travelDate,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return TicketTrip.fromJson(json.decode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Failed to create trip: ${response.body}');
+  }
+
+  Future<TicketTrip> getTrip(int tripId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl${ApiConfig.tripDetail(tripId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      return TicketTrip.fromJson(json.decode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Failed to load trip: ${response.body}');
+  }
+
+  Future<TicketTrip> updateTrip(
+    int tripId, {
+    String? name,
+    String? notes,
+    String? travelDate,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (notes != null) body['notes'] = notes;
+    if (travelDate != null) body['travel_date'] = travelDate;
+    final response = await http.patch(
+      Uri.parse('$_baseUrl${ApiConfig.tripDetail(tripId)}'),
+      headers: _headers,
+      body: json.encode(body),
+    );
+    if (response.statusCode == 200) {
+      return TicketTrip.fromJson(json.decode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Failed to update trip: ${response.body}');
+  }
+
+  Future<void> deleteTrip(int tripId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl${ApiConfig.tripDetail(tripId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+    throw Exception('Failed to delete trip: ${response.body}');
+  }
+
+  Future<TicketTrip> addTicketsToTrip(int tripId, List<int> ticketIds) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl${ApiConfig.tripTickets(tripId)}'),
+      headers: _headers,
+      body: json.encode({'ticket_ids': ticketIds}),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return TicketTrip.fromJson(json.decode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Failed to add tickets to trip: ${response.body}');
+  }
+
+  Future<TicketTrip> removeTicketFromTrip(int tripId, int ticketId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl${ApiConfig.tripTicket(tripId, ticketId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      return TicketTrip.fromJson(json.decode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Failed to remove ticket from trip: ${response.body}');
   }
 }

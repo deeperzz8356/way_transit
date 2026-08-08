@@ -7,7 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
+import '../widgets/create_trip_sheet.dart';
+import '../widgets/trip_picker_sheet.dart';
 import 'ticket_detail_screen.dart';
+import 'trip_detail_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -19,6 +22,7 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen>
     with SingleTickerProviderStateMixin {
   final _api = ApiService();
+  List<TicketTrip> _trips = [];
   List<Booking> _tickets = [];
   List<UserPassItem> _passes = [];
   bool _isLoading = true;
@@ -26,6 +30,10 @@ class _WalletScreenState extends State<WalletScreen>
   String _modeFilter = 'all';
   String _statusTab = 'active'; // active|used|expired|all
   late TabController _statusTabs;
+
+  bool _selectMode = false;
+  final Set<int> _selectedIds = {};
+  final Set<int> _expandedTripIds = {};
 
   static const _modes = ['all', 'rail', 'metro', 'bus', 'cab'];
 
@@ -56,6 +64,11 @@ class _WalletScreenState extends State<WalletScreen>
     return Color(int.parse('FF$cleaned', radix: 16));
   }
 
+  Future<void> _ensureToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _api.setToken(prefs.getString('token') ?? 'dev-token');
+  }
+
   Future<void> _loadCachedThenFetch() async {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString('wallet_cache');
@@ -64,6 +77,7 @@ class _WalletScreenState extends State<WalletScreen>
         final data = WalletData.fromJson(json.decode(cached));
         if (mounted) {
           setState(() {
+            _trips = data.trips;
             _tickets = data.tickets;
             _passes = data.passes;
             _isLoading = false;
@@ -77,21 +91,20 @@ class _WalletScreenState extends State<WalletScreen>
   Future<void> _fetchWallet() async {
     setState(() {
       _error = null;
-      if (_tickets.isEmpty) _isLoading = true;
+      if (_tickets.isEmpty && _trips.isEmpty) _isLoading = true;
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      _api.setToken(token ?? 'dev-token');
-
+      await _ensureToken();
       final wallet = await _api.getWallet(
         mode: _modeFilter == 'all' ? null : _modeFilter,
       );
+      final prefs = await SharedPreferences.getInstance();
       await prefs.setString('wallet_cache', json.encode(wallet.toJson()));
 
       if (!mounted) return;
       setState(() {
+        _trips = wallet.trips;
         _tickets = wallet.tickets;
         _passes = wallet.passes;
         _isLoading = false;
@@ -105,20 +118,22 @@ class _WalletScreenState extends State<WalletScreen>
     }
   }
 
-  List<Booking> get _filteredTickets {
-    final list = _tickets.where((t) {
-      final s = t.status.toUpperCase();
-      switch (_statusTab) {
-        case 'active':
-          return s == 'CONFIRMED' || s == 'IN_PROGRESS';
-        case 'used':
-          return s == 'USED';
-        case 'expired':
-          return s == 'EXPIRED';
-        default:
-          return true;
-      }
-    }).toList();
+  bool _matchesStatus(Booking t) {
+    final s = t.status.toUpperCase();
+    switch (_statusTab) {
+      case 'active':
+        return s == 'CONFIRMED' || s == 'IN_PROGRESS';
+      case 'used':
+        return s == 'USED';
+      case 'expired':
+        return s == 'EXPIRED';
+      default:
+        return true;
+    }
+  }
+
+  List<Booking> _filterTickets(List<Booking> tickets) {
+    final list = tickets.where(_matchesStatus).toList();
     list.sort((a, b) {
       if (a.activeBadge != b.activeBadge) {
         return a.activeBadge ? -1 : 1;
@@ -126,6 +141,19 @@ class _WalletScreenState extends State<WalletScreen>
       return 0;
     });
     return list;
+  }
+
+  List<Booking> get _filteredUngrouped => _filterTickets(_tickets);
+
+  List<TicketTrip> get _visibleTrips {
+    return _trips.where((trip) {
+      final filtered = _filterTickets(trip.tickets);
+      // Keep empty trips visible on "all" / "active" so users can open them
+      if (trip.tickets.isEmpty) {
+        return _statusTab == 'all' || _statusTab == 'active';
+      }
+      return filtered.isNotEmpty;
+    }).toList();
   }
 
   String _routeLabel(Booking ticket) {
@@ -141,8 +169,7 @@ class _WalletScreenState extends State<WalletScreen>
 
   Future<void> _addDemoPass() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _api.setToken(prefs.getString('token') ?? 'dev-token');
+      await _ensureToken();
       final products = await _api.listPassProducts();
       if (products.isEmpty) return;
       await _api.addPassToWallet(products.first.passId);
@@ -159,21 +186,107 @@ class _WalletScreenState extends State<WalletScreen>
     }
   }
 
+  void _exitSelectMode() {
+    setState(() {
+      _selectMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  Future<void> _createTrip() async {
+    final data = await showCreateTripSheet(context);
+    if (data == null || data['name'] == null) return;
+    try {
+      await _ensureToken();
+      await _api.createTrip(
+        name: data['name']!,
+        notes: data['notes'],
+        travelDate: data['travelDate'],
+      );
+      await _fetchWallet();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Trip "${data['name']}" created')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _addSelectedToTrip() async {
+    if (_selectedIds.isEmpty) return;
+    final result = await showTripPickerSheet(context, trips: _trips);
+    if (result == null) return;
+    try {
+      await _ensureToken();
+      int tripId;
+      if (result.isCreate) {
+        final trip = await _api.createTrip(
+          name: result.newName!,
+          notes: result.newNotes,
+          travelDate: result.newTravelDate,
+        );
+        tripId = trip.id;
+      } else {
+        tripId = result.tripId!;
+      }
+      await _api.addTicketsToTrip(tripId, _selectedIds.toList());
+      _exitSelectMode();
+      await _fetchWallet();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tickets added to trip')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasContent =
+        _passes.isNotEmpty || _visibleTrips.isNotEmpty || _filteredUngrouped.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Unified Wallet'),
+        title: Text(_selectMode
+            ? '${_selectedIds.length} selected'
+            : 'My Unified Wallet'),
+        leading: _selectMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _exitSelectMode,
+              )
+            : null,
         actions: [
-          IconButton(
-            onPressed: _addDemoPass,
-            tooltip: 'Add pass',
-            icon: const Icon(Icons.card_membership),
-          ),
-          IconButton(
-            onPressed: _fetchWallet,
-            icon: const Icon(Icons.refresh),
-          ),
+          if (_selectMode)
+            TextButton(
+              onPressed: _selectedIds.isEmpty ? null : _addSelectedToTrip,
+              child: const Text('Add to trip'),
+            )
+          else ...[
+            IconButton(
+              onPressed: _createTrip,
+              tooltip: 'New trip',
+              icon: const Icon(Icons.create_new_folder_outlined),
+            ),
+            IconButton(
+              onPressed: () => setState(() => _selectMode = true),
+              tooltip: 'Select tickets',
+              icon: const Icon(Icons.checklist),
+            ),
+            IconButton(
+              onPressed: _addDemoPass,
+              tooltip: 'Add pass',
+              icon: const Icon(Icons.card_membership),
+            ),
+            IconButton(
+              onPressed: _fetchWallet,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
         ],
         bottom: TabBar(
           controller: _statusTabs,
@@ -213,7 +326,7 @@ class _WalletScreenState extends State<WalletScreen>
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _error != null && _tickets.isEmpty
+                : _error != null && !hasContent
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
@@ -237,33 +350,63 @@ class _WalletScreenState extends State<WalletScreen>
                           padding: const EdgeInsets.all(16),
                           children: [
                             if (_passes.isNotEmpty) ...[
-                              const Text('Passes',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
+                              const Text(
+                                'Passes',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               const SizedBox(height: 8),
                               ..._passes.map(_buildPassCard),
                               const SizedBox(height: 16),
-                              const Text('Tickets',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
                             ],
-                            if (_filteredTickets.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 48),
-                                child: Center(
+                            if (_visibleTrips.isNotEmpty) ...[
+                              const Text(
+                                'Trips',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ..._visibleTrips.map(_buildTripSection),
+                              const SizedBox(height: 16),
+                            ],
+                            if (_filteredUngrouped.isNotEmpty ||
+                                (_visibleTrips.isEmpty &&
+                                    _passes.isEmpty &&
+                                    _filteredUngrouped.isEmpty)) ...[
+                              if (_visibleTrips.isNotEmpty ||
+                                  _passes.isNotEmpty ||
+                                  _trips.isNotEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 8),
                                   child: Text(
-                                    'No tickets in this view.\nAdd a ticket to get started!',
-                                    textAlign: TextAlign.center,
+                                    'Other tickets',
                                     style: TextStyle(
-                                        fontSize: 16, color: Colors.grey),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              )
-                            else
-                              ..._filteredTickets.map(_buildTicketCard),
+                              if (_filteredUngrouped.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 48),
+                                  child: Center(
+                                    child: Text(
+                                      'No tickets in this view.\nAdd a ticket or create a trip!',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ..._filteredUngrouped.map(_buildTicketCard),
+                            ],
                           ],
                         ),
                       ),
@@ -297,70 +440,102 @@ class _WalletScreenState extends State<WalletScreen>
     );
   }
 
-  Widget _buildTicketCard(Booking ticket) {
-    final color = _colorFor(ticket.colorHex, ticket.mode);
-    return Dismissible(
-      key: ValueKey('ticket-${ticket.id}'),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Delete ticket?'),
-                content: Text(
-                  'Remove ${_routeLabel(ticket)} from your wallet?',
+  Widget _buildTripSection(TicketTrip trip) {
+    final filtered = _filterTickets(trip.tickets);
+    final expanded = _expandedTripIds.contains(trip.id);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.folder_special_outlined),
+            title: Text(
+              trip.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              '${filtered.length} ticket${filtered.length == 1 ? '' : 's'}'
+              '${trip.travelDate != null ? ' · ${trip.travelDate}' : ''}',
+            ),
+            trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more),
+            onTap: () async {
+              if (_selectMode) {
+                setState(() {
+                  if (expanded) {
+                    _expandedTripIds.remove(trip.id);
+                  } else {
+                    _expandedTripIds.add(trip.id);
+                  }
+                });
+                return;
+              }
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TripDetailScreen(trip: trip),
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('Delete'),
-                  ),
-                ],
+              );
+              _fetchWallet();
+            },
+            onLongPress: () {
+              setState(() {
+                if (expanded) {
+                  _expandedTripIds.remove(trip.id);
+                } else {
+                  _expandedTripIds.add(trip.id);
+                }
+              });
+            },
+          ),
+          if (expanded && filtered.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Column(
+                children: filtered
+                    .map((t) => _buildTicketCard(t, compact: true))
+                    .toList(),
               ),
-            ) ??
-            false;
-      },
-      onDismissed: (_) async {
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          _api.setToken(prefs.getString('token') ?? 'dev-token');
-          await _api.deleteTicket(ticket.id);
-          if (!mounted) return;
-          setState(() {
-            _tickets.removeWhere((t) => t.id == ticket.id);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ticket deleted')),
-          );
-        } catch (e) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('$e')));
-          _fetchWallet();
-        }
-      },
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.red.shade400,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.delete, color: Colors.white),
+            ),
+          if (expanded && filtered.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Text(
+                'No tickets match this filter',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+        ],
       ),
-      child: Card(
-      margin: const EdgeInsets.only(bottom: 16),
+    );
+  }
+
+  Widget _buildTicketCard(Booking ticket, {bool compact = false}) {
+    final color = _colorFor(ticket.colorHex, ticket.mode);
+    final selected = _selectedIds.contains(ticket.id);
+
+    Widget cardBody = Card(
+      margin: EdgeInsets.only(bottom: compact ? 8 : 16),
       elevation: ticket.activeBadge ? 6 : 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: selected ? Colors.blue.shade50 : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
+        onLongPress: () {
+          setState(() {
+            _selectMode = true;
+            _selectedIds.add(ticket.id);
+          });
+        },
         onTap: () async {
+          if (_selectMode) {
+            setState(() {
+              if (selected) {
+                _selectedIds.remove(ticket.id);
+              } else {
+                _selectedIds.add(ticket.id);
+              }
+            });
+            return;
+          }
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => TicketDetailScreen(ticket: ticket),
@@ -378,12 +553,22 @@ class _WalletScreenState extends State<WalletScreen>
             ),
             borderRadius: BorderRadius.circular(12),
           ),
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(compact ? 12 : 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
+                  if (_selectMode)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Icon(
+                        selected
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked,
+                        color: selected ? Colors.blue : Colors.grey,
+                      ),
+                    ),
                   Expanded(
                     child: Wrap(
                       spacing: 6,
@@ -426,14 +611,16 @@ class _WalletScreenState extends State<WalletScreen>
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Delete ticket',
-                    onPressed: () => _confirmDelete(ticket),
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                  ),
+                  if (!_selectMode)
+                    IconButton(
+                      tooltip: 'Delete ticket',
+                      onPressed: () => _confirmDelete(ticket),
+                      icon:
+                          const Icon(Icons.delete_forever, color: Colors.red),
+                    ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 4 : 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -443,69 +630,117 @@ class _WalletScreenState extends State<WalletScreen>
                       children: [
                         Text(
                           _routeLabel(ticket),
-                          style: const TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: compact ? 15 : 17,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                            ticket.activeBadge
-                                ? 'Status: ACTIVE JOURNEY'
-                                : 'Status: ${ticket.status}',
-                            style: TextStyle(
-                                color: ticket.activeBadge
-                                    ? Colors.green.shade700
-                                    : ticket.status == 'USED'
-                                        ? Colors.grey
-                                        : Colors.green,
-                                fontWeight: FontWeight.w600)),
-                        if (ticket.journeyStartedAt != null)
-                          Text(
-                            'Start: ${ticket.journeyStartedAt!.toLocal().toString().substring(0, 16)}',
-                            style: const TextStyle(
-                                color: Colors.black54, fontSize: 12),
+                          ticket.activeBadge
+                              ? 'Status: ACTIVE JOURNEY'
+                              : 'Status: ${ticket.status}',
+                          style: TextStyle(
+                            color: ticket.activeBadge
+                                ? Colors.green.shade700
+                                : ticket.status == 'USED'
+                                    ? Colors.grey
+                                    : Colors.green,
+                            fontWeight: FontWeight.w600,
                           ),
-                        if (ticket.journeyEstimatedEndAt != null)
-                          Text(
-                            'Est. end: ${ticket.journeyEstimatedEndAt!.toLocal().toString().substring(0, 16)}',
-                            style: const TextStyle(
-                                color: Colors.black54, fontSize: 12),
-                          ),
-                        if (ticket.ticketNumber != null &&
+                        ),
+                        if (!compact && ticket.ticketNumber != null &&
                             ticket.ticketNumber!.isNotEmpty)
                           Text('No: ${ticket.ticketNumber}',
                               style: const TextStyle(color: Colors.black54)),
-                        Text(
-                          'Added: ${ticket.bookedAt != null ? ticket.bookedAt!.toLocal().toString().split(' ').first : 'N/A'}',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
                       ],
                     ),
                   ),
-                  Column(
-                    children: [
-                      QrImageView(
-                        data: ticket.displayQr,
-                        version: QrVersions.auto,
-                        size: 80,
-                      ),
-                      Text(
-                        ticket.displayQr.length > 8
-                            ? ticket.displayQr.substring(0, 8).toUpperCase()
-                            : ticket.displayQr.toUpperCase(),
-                        style: const TextStyle(
+                  if (!compact)
+                    Column(
+                      children: [
+                        QrImageView(
+                          data: ticket.displayQr,
+                          version: QrVersions.auto,
+                          size: 80,
+                        ),
+                        Text(
+                          ticket.displayQr.length > 8
+                              ? ticket.displayQr.substring(0, 8).toUpperCase()
+                              : ticket.displayQr.toUpperCase(),
+                          style: const TextStyle(
                             fontSize: 11,
                             fontFamily: 'monospace',
-                            color: Colors.grey),
-                      ),
-                    ],
-                  ),
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ],
           ),
         ),
       ),
-    ),
+    );
+
+    if (_selectMode || compact) return cardBody;
+
+    return Dismissible(
+      key: ValueKey('ticket-${ticket.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Delete ticket?'),
+                content: Text(
+                  'Remove ${_routeLabel(ticket)} from your wallet?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      },
+      onDismissed: (_) async {
+        try {
+          await _ensureToken();
+          await _api.deleteTicket(ticket.id);
+          if (!mounted) return;
+          setState(() {
+            _tickets.removeWhere((t) => t.id == ticket.id);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ticket deleted')),
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('$e')));
+          _fetchWallet();
+        }
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.red.shade400,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      child: cardBody,
     );
   }
 
@@ -530,11 +765,30 @@ class _WalletScreenState extends State<WalletScreen>
     );
     if (ok != true) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _api.setToken(prefs.getString('token') ?? 'dev-token');
+      await _ensureToken();
       await _api.deleteTicket(ticket.id);
       if (!mounted) return;
-      setState(() => _tickets.removeWhere((t) => t.id == ticket.id));
+      setState(() {
+        _tickets.removeWhere((t) => t.id == ticket.id);
+        for (var i = 0; i < _trips.length; i++) {
+          final trip = _trips[i];
+          if (trip.tickets.any((t) => t.id == ticket.id)) {
+            final remaining =
+                trip.tickets.where((t) => t.id != ticket.id).toList();
+            _trips[i] = TicketTrip(
+              id: trip.id,
+              userId: trip.userId,
+              name: trip.name,
+              notes: trip.notes,
+              travelDate: trip.travelDate,
+              ticketCount: remaining.length,
+              tickets: remaining,
+              createdAt: trip.createdAt,
+              updatedAt: trip.updatedAt,
+            );
+          }
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ticket deleted')),
       );
