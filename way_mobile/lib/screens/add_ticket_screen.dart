@@ -11,7 +11,15 @@ import '../services/api_service.dart';
 import '../widgets/create_trip_sheet.dart';
 
 class AddTicketScreen extends StatefulWidget {
-  const AddTicketScreen({super.key});
+  /// When set, new tickets are saved into this trip by default.
+  final int? initialTripId;
+  final String? initialTripName;
+
+  const AddTicketScreen({
+    super.key,
+    this.initialTripId,
+    this.initialTripName,
+  });
 
   @override
   State<AddTicketScreen> createState() => _AddTicketScreenState();
@@ -45,6 +53,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTripId = widget.initialTripId;
     _loadTrips();
   }
 
@@ -70,7 +79,23 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
       await _ensureAuth();
       final trips = await _api.listTrips();
       if (!mounted) return;
-      setState(() => _trips = trips);
+      setState(() {
+        _trips = trips;
+        // Keep preselected trip even if list is momentarily empty.
+        if (_selectedTripId != null &&
+            trips.every((t) => t.id != _selectedTripId) &&
+            widget.initialTripId != null &&
+            widget.initialTripName != null) {
+          _trips = [
+            TicketTrip(
+              id: widget.initialTripId!,
+              userId: 0,
+              name: widget.initialTripName!,
+            ),
+            ...trips,
+          ];
+        }
+      });
     } catch (_) {
       // Trips are optional at save time; ignore load failures.
     }
@@ -337,8 +362,19 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ticket saved to Unified Wallet!')),
+        SnackBar(
+          content: Text(
+            _selectedTripId == null
+                ? 'Ticket saved to Unified Wallet!'
+                : 'Ticket saved to trip!',
+          ),
+        ),
       );
+      // If opened from a trip detail, return so that screen can refresh.
+      if (widget.initialTripId != null && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+        return;
+      }
       setState(() {
         _sourceController.clear();
         _destinationController.clear();
@@ -352,7 +388,7 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
         _transitMap = null;
         _liveTail.clear();
         _mode = 'other';
-        _selectedTripId = null;
+        _selectedTripId = widget.initialTripId;
         _isSaving = false;
       });
     } catch (e) {
@@ -371,7 +407,11 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
     final accent = _modeColor(_mode);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Ticket / Pass'),
+        title: Text(
+          widget.initialTripName != null
+              ? 'Add to ${widget.initialTripName}'
+              : 'Add Ticket / Pass',
+        ),
         backgroundColor: accent,
         foregroundColor: Colors.white,
       ),
@@ -611,53 +651,90 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
                             ),
                           );
                         }),
-                        DropdownButtonFormField<int?>(
-                          value: _selectedTripId,
-                          decoration: const InputDecoration(
-                            labelText: 'Add to trip (optional)',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            const DropdownMenuItem<int?>(
-                              value: null,
-                              child: Text('No trip — keep ungrouped'),
-                            ),
-                            ..._trips.map(
-                              (t) => DropdownMenuItem<int?>(
-                                value: t.id,
-                                child: Text(t.name),
-                              ),
-                            ),
-                          ],
-                          onChanged: (v) => setState(() => _selectedTripId = v),
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: _createTripInline,
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('New trip'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: _isSaving ? null : _saveTicket,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: Text(
-                            _isSaving ? 'Saving…' : 'Save to Wallet',
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        widget.initialTripId != null
+                            ? 'Saving into trip'
+                            : 'Save to wallet',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (widget.initialTripName != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.initialTripName!,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int?>(
+                        value: _selectedTripId,
+                        decoration: const InputDecoration(
+                          labelText: 'Add to trip (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('No trip — keep ungrouped'),
+                          ),
+                          ..._trips.map(
+                            (t) => DropdownMenuItem<int?>(
+                              value: t.id,
+                              child: Text(t.name),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _selectedTripId = v),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _createTripInline,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('New trip'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _isSaving ? null : _saveTicket,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: Text(
+                          _isSaving
+                              ? 'Saving…'
+                              : (_selectedTripId == null
+                                  ? 'Save to Wallet'
+                                  : 'Save to Trip'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),

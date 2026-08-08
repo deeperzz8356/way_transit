@@ -146,13 +146,10 @@ class _WalletScreenState extends State<WalletScreen>
   List<Booking> get _filteredUngrouped => _filterTickets(_tickets);
 
   List<TicketTrip> get _visibleTrips {
+    // Empty trips always stay visible so "create trip first" works.
     return _trips.where((trip) {
-      final filtered = _filterTickets(trip.tickets);
-      // Keep empty trips visible on "all" / "active" so users can open them
-      if (trip.tickets.isEmpty) {
-        return _statusTab == 'all' || _statusTab == 'active';
-      }
-      return filtered.isNotEmpty;
+      if (trip.tickets.isEmpty) return true;
+      return _filterTickets(trip.tickets).isNotEmpty;
     }).toList();
   }
 
@@ -198,7 +195,7 @@ class _WalletScreenState extends State<WalletScreen>
     if (data == null || data['name'] == null) return;
     try {
       await _ensureToken();
-      await _api.createTrip(
+      final trip = await _api.createTrip(
         name: data['name']!,
         notes: data['notes'],
         travelDate: data['travelDate'],
@@ -208,6 +205,13 @@ class _WalletScreenState extends State<WalletScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Trip "${data['name']}" created')),
       );
+      // Open the new trip so the user can add tickets immediately.
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TripDetailScreen(trip: trip),
+        ),
+      );
+      _fetchWallet();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -372,6 +376,19 @@ class _WalletScreenState extends State<WalletScreen>
                               const SizedBox(height: 8),
                               ..._visibleTrips.map(_buildTripSection),
                               const SizedBox(height: 16),
+                            ] else if (!_selectMode) ...[
+                              Card(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                child: ListTile(
+                                  leading: const Icon(Icons.create_new_folder_outlined),
+                                  title: const Text('Create a trip'),
+                                  subtitle: const Text(
+                                    'Name a trip first, then add tickets to it',
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: _createTrip,
+                                ),
+                              ),
                             ],
                             if (_filteredUngrouped.isNotEmpty ||
                                 (_visibleTrips.isEmpty &&
@@ -442,26 +459,32 @@ class _WalletScreenState extends State<WalletScreen>
 
   Widget _buildTripSection(TicketTrip trip) {
     final filtered = _filterTickets(trip.tickets);
-    final expanded = _expandedTripIds.contains(trip.id);
+    final expanded = _expandedTripIds.contains(trip.id) || trip.tickets.isEmpty;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Column(
         children: [
           ListTile(
-            leading: const Icon(Icons.folder_special_outlined),
+            leading: Icon(
+              trip.tickets.isEmpty
+                  ? Icons.folder_open_outlined
+                  : Icons.folder_special_outlined,
+            ),
             title: Text(
               trip.name,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
-              '${filtered.length} ticket${filtered.length == 1 ? '' : 's'}'
-              '${trip.travelDate != null ? ' · ${trip.travelDate}' : ''}',
+              trip.tickets.isEmpty
+                  ? 'Empty · tap to add tickets'
+                  : '${filtered.length} ticket${filtered.length == 1 ? '' : 's'}'
+                      '${trip.travelDate != null ? ' · ${trip.travelDate}' : ''}',
             ),
-            trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () async {
               if (_selectMode) {
                 setState(() {
-                  if (expanded) {
+                  if (_expandedTripIds.contains(trip.id)) {
                     _expandedTripIds.remove(trip.id);
                   } else {
                     _expandedTripIds.add(trip.id);
@@ -476,15 +499,6 @@ class _WalletScreenState extends State<WalletScreen>
               );
               _fetchWallet();
             },
-            onLongPress: () {
-              setState(() {
-                if (expanded) {
-                  _expandedTripIds.remove(trip.id);
-                } else {
-                  _expandedTripIds.add(trip.id);
-                }
-              });
-            },
           ),
           if (expanded && filtered.isNotEmpty)
             Padding(
@@ -495,7 +509,23 @@ class _WalletScreenState extends State<WalletScreen>
                     .toList(),
               ),
             ),
-          if (expanded && filtered.isEmpty)
+          if (expanded && trip.tickets.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TripDetailScreen(trip: trip),
+                    ),
+                  );
+                  _fetchWallet();
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Open trip & add tickets'),
+              ),
+            )
+          else if (expanded && filtered.isEmpty)
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Text(

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
+import 'add_ticket_screen.dart';
 import 'ticket_detail_screen.dart';
 
 class TripDetailScreen extends StatefulWidget {
@@ -184,18 +185,60 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       final wallet = await _api.getWallet();
       if (!mounted) return;
       final ungrouped = wallet.tickets;
-      if (ungrouped.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No ungrouped tickets to add')),
-        );
+
+      // Always offer: add existing ungrouped tickets AND/OR add a brand-new ticket.
+      final choice = await showModalBottomSheet<String>(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                title: Text(
+                  'Add to this trip',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.confirmation_number_outlined),
+                title: const Text('Add new ticket'),
+                subtitle: const Text('Scan or enter a ticket into this trip'),
+                onTap: () => Navigator.pop(ctx, 'new'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.playlist_add_check),
+                title: const Text('Add existing tickets'),
+                subtitle: Text(
+                  ungrouped.isEmpty
+                      ? 'No ungrouped tickets in wallet'
+                      : '${ungrouped.length} ungrouped ticket${ungrouped.length == 1 ? '' : 's'}',
+                ),
+                enabled: ungrouped.isNotEmpty,
+                onTap: ungrouped.isEmpty
+                    ? null
+                    : () => Navigator.pop(ctx, 'existing'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+
+      if (choice == 'new') {
+        await _addNewTicket();
         return;
       }
+      if (choice != 'existing') return;
+
       final selected = <int>{};
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setLocal) => AlertDialog(
-            title: const Text('Add tickets'),
+            title: const Text('Add existing tickets'),
             content: SizedBox(
               width: double.maxFinite,
               child: ListView.builder(
@@ -249,6 +292,20 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     }
   }
 
+  Future<void> _addNewTicket() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AddTicketScreen(
+          initialTripId: _trip.id,
+          initialTripName: _trip.name,
+        ),
+      ),
+    );
+    if (saved == true || saved == null) {
+      await _refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -295,14 +352,32 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   ],
                   const SizedBox(height: 16),
                   if (_trip.tickets.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 48),
-                      child: Center(
-                        child: Text(
-                          'No tickets in this trip yet.\nTap Add tickets to group some.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'No tickets in this trip yet.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Add a new ticket or move existing ones from your wallet.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: _addNewTicket,
+                            icon: const Icon(Icons.confirmation_number_outlined),
+                            label: const Text('Add new ticket'),
+                          ),
+                          TextButton(
+                            onPressed: _addTickets,
+                            child: const Text('Choose how to add'),
+                          ),
+                        ],
                       ),
                     )
                   else
