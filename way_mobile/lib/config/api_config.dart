@@ -45,6 +45,7 @@ class ApiConfig {
   static const String addTicket = '/booking/add-ticket';
   static const String uploadTicket = '/booking/upload-ticket';
   static const String listPasses = '/booking/passes';
+  static const String trips = '/booking/trips';
 
   static String ticketJob(int jobId) => '/booking/ticket-jobs/$jobId';
   static String ticketJobEvents(int jobId) => '/booking/ticket-jobs/$jobId/events';
@@ -54,6 +55,10 @@ class ApiConfig {
   static String startJourney(int id) => '/booking/tickets/$id/start-journey';
   static String completeJourney(int id) => '/booking/tickets/$id/complete';
   static String addPass(int passId) => '/booking/passes/$passId/add';
+  static String tripDetail(int id) => '/booking/trips/$id';
+  static String tripTickets(int id) => '/booking/trips/$id/tickets';
+  static String tripTicket(int tripId, int ticketId) =>
+      '/booking/trips/$tripId/tickets/$ticketId';
 
   static String resolveUrl(String pathOrUrl) {
     if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {

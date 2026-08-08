@@ -243,6 +243,7 @@ class User(Base):
     saved_places = relationship("SavedPlace", back_populates="user")
     reward_points = relationship("RewardPoint", back_populates="user")
     wallet = relationship("Wallet", uselist=False, back_populates="user")
+    ticket_trips = relationship("TicketTrip", back_populates="user")
 
 class OTPCode(Base):
     __tablename__ = "otp_codes"
@@ -265,6 +266,21 @@ class Wallet(Base):
 
     user = relationship("User", back_populates="wallet")
 
+class TicketTrip(Base):
+    """User-named collection that groups multiple wallet tickets for one trip."""
+    __tablename__ = "ticket_trips"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    name = Column(String, nullable=False)
+    notes = Column(String, nullable=True)
+    travel_date = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="ticket_trips")
+    tickets = relationship("Booking", back_populates="ticket_trip")
+
+
 class Booking(Base):
     __tablename__ = "bookings"
     id = Column(Integer, primary_key=True, index=True)
@@ -273,6 +289,7 @@ class Booking(Base):
     from_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     to_stop_id = Column(Integer, ForeignKey("stops.id"), index=True)
     trip_id = Column(Integer, ForeignKey("trips.id"), index=True)
+    ticket_trip_id = Column(Integer, ForeignKey("ticket_trips.id"), nullable=True, index=True)
     distance_km = Column(Float)
     image_url = Column(String, nullable=True)
     ticket_code = Column(String, unique=True, index=True)
@@ -298,6 +315,7 @@ class Booking(Base):
     departure_stop = relationship("Stop", foreign_keys=[from_stop_id], back_populates="departure_bookings")
     arrival_stop = relationship("Stop", foreign_keys=[to_stop_id], back_populates="arrival_bookings")
     trip = relationship("Trip", back_populates="bookings")
+    ticket_trip = relationship("TicketTrip", back_populates="tickets")
     reward_points = relationship("RewardPoint", back_populates="booking")
     journeys = relationship("Journey", back_populates="booking")
 

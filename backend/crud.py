@@ -200,9 +200,22 @@ def create_unified_ticket(
     fare: float = None,
     source_type: str = "manual",
     operator_id: int = None,
+    ticket_trip_id: int = None,
 ):
     """Create a wallet ticket with actual ticket identity fields."""
     mode_n = normalize_mode(mode) if mode else infer_mode_from_operator(operator_name)
+
+    if ticket_trip_id is not None:
+        trip = (
+            db.query(models.TicketTrip)
+            .filter(
+                models.TicketTrip.id == ticket_trip_id,
+                models.TicketTrip.user_id == user_id,
+            )
+            .first()
+        )
+        if not trip:
+            raise ValueError("Trip not found")
 
     ticket_code = str(uuid.uuid4())
     booking = models.Booking(
@@ -222,6 +235,7 @@ def create_unified_ticket(
         source=source,
         destination=destination,
         travel_date=_parse_travel_date(travel_date) if isinstance(travel_date, str) else travel_date,
+        ticket_trip_id=ticket_trip_id,
     )
     db.add(booking)
     db.commit()
@@ -404,13 +418,20 @@ def complete_ticket_journey(db: Session, user_id: int, booking_id: int):
 
 
 def get_user_wallet(db: Session, user_id: int, mode: Optional[str] = None):
-    q = db.query(models.Booking).filter(models.Booking.user_id == user_id)
-    if mode and mode != "all":
-        q = q.filter(models.Booking.mode == normalize_mode(mode))
-    tickets = q.order_by(models.Booking.booked_at.desc()).all()
-    # Expire dated tickets
+    """Return (ungrouped_tickets, trips, passes).
+
+    Ungrouped tickets are bookings with ticket_trip_id IS NULL.
+    When mode is set, ungrouped tickets are mode-filtered; trip rows are
+    still returned (callers filter nested tickets when serializing).
+    """
     today = date.today()
-    for t in tickets:
+    all_user_tickets = (
+        db.query(models.Booking)
+        .filter(models.Booking.user_id == user_id)
+        .order_by(models.Booking.booked_at.desc())
+        .all()
+    )
+    for t in all_user_tickets:
         if (
             t.travel_date
             and t.travel_date < today
@@ -420,13 +441,203 @@ def get_user_wallet(db: Session, user_id: int, mode: Optional[str] = None):
             db.add(t)
     db.commit()
 
+    mode_n = normalize_mode(mode) if mode and mode != "all" else None
+
+    def _mode_ok(t):
+        return mode_n is None or t.mode == mode_n
+
+    ungrouped = [
+        t for t in all_user_tickets if t.ticket_trip_id is None and _mode_ok(t)
+    ]
+
+    trips = (
+        db.query(models.TicketTrip)
+        .filter(models.TicketTrip.user_id == user_id)
+        .order_by(models.TicketTrip.updated_at.desc())
+        .all()
+    )
+
     passes = (
         db.query(models.UserPass)
         .filter(models.UserPass.user_id == user_id)
         .order_by(models.UserPass.created_at.desc())
         .all()
     )
-    return tickets, passes
+    return ungrouped, trips, passes
+
+
+def create_ticket_trip(
+    db: Session,
+    user_id: int,
+    name: str,
+    notes: Optional[str] = None,
+    travel_date: Optional[str] = None,
+):
+    cleaned = (name or "").strip()
+    if not cleaned:
+        raise ValueError("Trip name is required")
+    trip = models.TicketTrip(
+        user_id=user_id,
+        name=cleaned,
+        notes=(notes or "").strip() or None,
+        travel_date=_parse_travel_date(travel_date) if isinstance(travel_date, str) else travel_date,
+    )
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+
+def list_user_ticket_trips(db: Session, user_id: int):
+    return (
+        db.query(models.TicketTrip)
+        .filter(models.TicketTrip.user_id == user_id)
+        .order_by(models.TicketTrip.updated_at.desc())
+        .all()
+    )
+
+
+def get_ticket_trip(db: Session, user_id: int, trip_id: int):
+    return (
+        db.query(models.TicketTrip)
+        .filter(
+            models.TicketTrip.id == trip_id,
+            models.TicketTrip.user_id == user_id,
+        )
+        .first()
+    )
+
+
+def update_ticket_trip(
+    db: Session,
+    user_id: int,
+    trip_id: int,
+    name: Optional[str] = None,
+    notes: Optional[str] = None,
+    travel_date: Optional[str] = None,
+):
+    trip = get_ticket_trip(db, user_id, trip_id)
+    if not trip:
+        return None, "Trip not found"
+    if name is not None:
+        cleaned = name.strip()
+        if not cleaned:
+            return None, "Trip name is required"
+        trip.name = cleaned
+    if notes is not None:
+        trip.notes = notes.strip() or None
+    if travel_date is not None:
+        if travel_date == "":
+            trip.travel_date = None
+        else:
+            trip.travel_date = (
+                _parse_travel_date(travel_date)
+                if isinstance(travel_date, str)
+                else travel_date
+            )
+    trip.updated_at = datetime.utcnow()
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    return trip, None
+
+
+def delete_ticket_trip(db: Session, user_id: int, trip_id: int):
+    trip = (
+        db.query(models.TicketTrip)
+        .filter(
+            models.TicketTrip.id == trip_id,
+            models.TicketTrip.user_id == user_id,
+        )
+        .first()
+    )
+    if not trip:
+        return False, "Trip not found"
+    members = (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.ticket_trip_id == trip_id,
+            models.Booking.user_id == user_id,
+        )
+        .all()
+    )
+    for booking in members:
+        booking.ticket_trip_id = None
+        db.add(booking)
+    db.delete(trip)
+    db.commit()
+    return True, None
+
+
+def add_tickets_to_trip(
+    db: Session,
+    user_id: int,
+    trip_id: int,
+    ticket_ids: list[int],
+):
+    trip = get_ticket_trip(db, user_id, trip_id)
+    if not trip:
+        return None, "Trip not found"
+    if not ticket_ids:
+        return trip, None
+
+    bookings = (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.user_id == user_id,
+            models.Booking.id.in_(ticket_ids),
+        )
+        .all()
+    )
+    found_ids = {b.id for b in bookings}
+    missing = [tid for tid in ticket_ids if tid not in found_ids]
+    if missing:
+        return None, f"Tickets not found: {missing}"
+
+    for booking in bookings:
+        booking.ticket_trip_id = trip_id
+        db.add(booking)
+    trip.updated_at = datetime.utcnow()
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    return trip, None
+
+
+def remove_ticket_from_trip(
+    db: Session,
+    user_id: int,
+    trip_id: int,
+    ticket_id: int,
+):
+    trip = (
+        db.query(models.TicketTrip)
+        .filter(
+            models.TicketTrip.id == trip_id,
+            models.TicketTrip.user_id == user_id,
+        )
+        .first()
+    )
+    if not trip:
+        return None, "Trip not found"
+    booking = (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.id == ticket_id,
+            models.Booking.user_id == user_id,
+            models.Booking.ticket_trip_id == trip_id,
+        )
+        .first()
+    )
+    if not booking:
+        return None, "Ticket not found in this trip"
+    booking.ticket_trip_id = None
+    db.add(booking)
+    trip.updated_at = datetime.utcnow()
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    return trip, None
 
 
 def ensure_demo_pass_products(db: Session):

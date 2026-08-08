@@ -49,6 +49,7 @@ class TicketAddRequest(BaseModel):
     class_name: Optional[str] = None
     fare: Optional[float] = None
     source_type: Optional[str] = "manual"
+    ticket_trip_id: Optional[int] = None
 
 class TicketConfirmRequest(BaseModel):
     source: str
@@ -61,6 +62,7 @@ class TicketConfirmRequest(BaseModel):
     mode: Optional[str] = None
     class_name: Optional[str] = None
     fare: Optional[float] = None
+    ticket_trip_id: Optional[int] = None
 
 class ChatRequest(BaseModel):
     message: str
@@ -94,6 +96,7 @@ class BookingResponse(BaseModel):
     source: Optional[str] = None
     destination: Optional[str] = None
     qr_display: Optional[str] = None
+    ticket_trip_id: Optional[int] = None
     route: Optional[RouteResponse] = None
     
     class Config:
@@ -221,7 +224,53 @@ class UserPassResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class TicketTripCreate(BaseModel):
+    name: str
+    notes: Optional[str] = None
+    travel_date: Optional[str] = None
+
+class TicketTripUpdate(BaseModel):
+    name: Optional[str] = None
+    notes: Optional[str] = None
+    travel_date: Optional[str] = None
+
+class TicketTripTicketsRequest(BaseModel):
+    ticket_ids: List[int] = Field(default_factory=list)
+
+class TicketTripResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    notes: Optional[str] = None
+    travel_date: Optional[date] = None
+    ticket_count: int = 0
+    tickets: List[BookingResponse] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_ticket_count(cls, data: Any):
+        if isinstance(data, dict):
+            tickets = data.get("tickets") or []
+            data = dict(data)
+            data["ticket_count"] = data.get("ticket_count")
+            if data["ticket_count"] is None:
+                data["ticket_count"] = len(tickets)
+            return data
+        tickets = getattr(data, "tickets", None) or []
+        # Attach computed count for ORM objects
+        try:
+            data.ticket_count = len(tickets)
+        except Exception:
+            pass
+        return data
+
 class WalletResponse(BaseModel):
+    trips: List[TicketTripResponse] = Field(default_factory=list)
     tickets: List[BookingResponse] = Field(default_factory=list)
     passes: List[UserPassResponse] = Field(default_factory=list)
 

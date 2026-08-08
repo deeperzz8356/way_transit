@@ -23,6 +23,7 @@ class Booking {
   final DateTime? journeyEstimatedEndAt;
   final bool isActive;
   final double? distanceKm;
+  final int? ticketTripId;
 
   Booking({
     required this.id,
@@ -49,6 +50,7 @@ class Booking {
     this.journeyEstimatedEndAt,
     this.isActive = false,
     this.distanceKm,
+    this.ticketTripId,
   });
 
   String get displayQr =>
@@ -104,6 +106,7 @@ class Booking {
           : null,
       isActive: json['is_active'] == true || status.toUpperCase() == 'IN_PROGRESS',
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      ticketTripId: json['ticket_trip_id'] as int?,
     );
   }
 
@@ -133,7 +136,38 @@ class Booking {
       'journey_estimated_end_at': journeyEstimatedEndAt?.toIso8601String(),
       'is_active': isActive,
       'distance_km': distanceKm,
+      'ticket_trip_id': ticketTripId,
     };
+  }
+
+  Booking copyWith({int? ticketTripId, bool clearTrip = false}) {
+    return Booking(
+      id: id,
+      userId: userId,
+      routeId: routeId,
+      status: status,
+      bookedAt: bookedAt,
+      source: source,
+      destination: destination,
+      imageUrl: imageUrl,
+      ticketCode: ticketCode,
+      ticketNumber: ticketNumber,
+      qrPayload: qrPayload,
+      qrDisplay: qrDisplay,
+      mode: mode,
+      modeLabel: modeLabel,
+      colorHex: colorHex,
+      operatorName: operatorName,
+      className: className,
+      fare: fare,
+      sourceType: sourceType,
+      travelDate: travelDate,
+      journeyStartedAt: journeyStartedAt,
+      journeyEstimatedEndAt: journeyEstimatedEndAt,
+      isActive: isActive,
+      distanceKm: distanceKm,
+      ticketTripId: clearTrip ? null : (ticketTripId ?? this.ticketTripId),
+    );
   }
 }
 
@@ -185,23 +219,89 @@ class UserPassItem {
       };
 }
 
+class TicketTrip {
+  final int id;
+  final int userId;
+  final String name;
+  final String? notes;
+  final String? travelDate;
+  final int ticketCount;
+  final List<Booking> tickets;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  TicketTrip({
+    required this.id,
+    required this.userId,
+    required this.name,
+    this.notes,
+    this.travelDate,
+    this.ticketCount = 0,
+    this.tickets = const [],
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory TicketTrip.fromJson(Map<String, dynamic> json) {
+    final tickets = (json['tickets'] as List? ?? [])
+        .map((e) => Booking.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return TicketTrip(
+      id: json['id'] as int,
+      userId: json['user_id'] as int,
+      name: json['name'] as String? ?? 'Trip',
+      notes: json['notes'] as String?,
+      travelDate: json['travel_date']?.toString(),
+      ticketCount: (json['ticket_count'] as int?) ?? tickets.length,
+      tickets: tickets,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'user_id': userId,
+        'name': name,
+        'notes': notes,
+        'travel_date': travelDate,
+        'ticket_count': ticketCount,
+        'tickets': tickets.map((t) => t.toJson()).toList(),
+        'created_at': createdAt?.toIso8601String(),
+        'updated_at': updatedAt?.toIso8601String(),
+      };
+}
+
 class WalletData {
+  final List<TicketTrip> trips;
   final List<Booking> tickets;
   final List<UserPassItem> passes;
 
-  WalletData({required this.tickets, required this.passes});
+  WalletData({
+    this.trips = const [],
+    required this.tickets,
+    required this.passes,
+  });
 
   factory WalletData.fromJson(Map<String, dynamic> json) {
+    final trips = (json['trips'] as List? ?? [])
+        .map((e) => TicketTrip.fromJson(e as Map<String, dynamic>))
+        .toList();
     final tickets = (json['tickets'] as List? ?? [])
         .map((e) => Booking.fromJson(e as Map<String, dynamic>))
         .toList();
     final passes = (json['passes'] as List? ?? [])
         .map((e) => UserPassItem.fromJson(e as Map<String, dynamic>))
         .toList();
-    return WalletData(tickets: tickets, passes: passes);
+    return WalletData(trips: trips, tickets: tickets, passes: passes);
   }
 
   Map<String, dynamic> toJson() => {
+        'trips': trips.map((t) => t.toJson()).toList(),
         'tickets': tickets.map((t) => t.toJson()).toList(),
         'passes': passes.map((p) => p.toJson()).toList(),
       };

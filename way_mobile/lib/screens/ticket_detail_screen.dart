@@ -6,6 +6,7 @@ import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
 import '../nav/app_nav.dart';
+import '../widgets/trip_picker_sheet.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Booking ticket;
@@ -20,11 +21,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   late Booking _ticket;
   final _api = ApiService();
   bool _busy = false;
+  String? _tripName;
 
   @override
   void initState() {
     super.initState();
     _ticket = widget.ticket;
+    _loadTripName();
   }
 
   Color get _color {
@@ -37,6 +40,89 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Future<void> _ensureAuth() async {
     final prefs = await SharedPreferences.getInstance();
     _api.setToken(prefs.getString('token') ?? 'dev-token');
+  }
+
+  Future<void> _loadTripName() async {
+    final tripId = _ticket.ticketTripId;
+    if (tripId == null) {
+      setState(() => _tripName = null);
+      return;
+    }
+    try {
+      await _ensureAuth();
+      final trip = await _api.getTrip(tripId);
+      if (!mounted) return;
+      setState(() => _tripName = trip.name);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _tripName = 'Trip #$tripId');
+    }
+  }
+
+  Future<void> _moveToTrip() async {
+    setState(() => _busy = true);
+    try {
+      await _ensureAuth();
+      final trips = await _api.listTrips();
+      if (!mounted) return;
+      final result = await showTripPickerSheet(context, trips: trips);
+      if (result == null) {
+        setState(() => _busy = false);
+        return;
+      }
+      int tripId;
+      String? name;
+      if (result.isCreate) {
+        final trip = await _api.createTrip(
+          name: result.newName!,
+          notes: result.newNotes,
+          travelDate: result.newTravelDate,
+        );
+        tripId = trip.id;
+        name = trip.name;
+      } else {
+        tripId = result.tripId!;
+        final matches = trips.where((t) => t.id == tripId);
+        name = matches.isEmpty ? null : matches.first.name;
+      }
+      await _api.addTicketsToTrip(tripId, [_ticket.id]);
+      if (!mounted) return;
+      setState(() {
+        _ticket = _ticket.copyWith(ticketTripId: tripId);
+        _tripName = name ?? 'Trip';
+        _busy = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Moved to ${_tripName ?? 'trip'}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _removeFromTrip() async {
+    final tripId = _ticket.ticketTripId;
+    if (tripId == null) return;
+    setState(() => _busy = true);
+    try {
+      await _ensureAuth();
+      await _api.removeTicketFromTrip(tripId, _ticket.id);
+      if (!mounted) return;
+      setState(() {
+        _ticket = _ticket.copyWith(clearTrip: true);
+        _tripName = null;
+        _busy = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Removed from trip')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   String _fmt(DateTime? dt) {
@@ -295,6 +381,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             _row('Start', _fmt(_ticket.journeyStartedAt)),
           if (_ticket.journeyEstimatedEndAt != null)
             _row('Est. end', _fmt(_ticket.journeyEstimatedEndAt)),
+          _row(
+            'Trip',
+            _ticket.ticketTripId == null
+                ? 'Ungrouped'
+                : (_tripName ?? 'Trip #${_ticket.ticketTripId}'),
+          ),
           if (_ticket.imageUrl != null && _ticket.imageUrl!.isNotEmpty) ...[
             const SizedBox(height: 16),
             ClipRRect(
@@ -326,6 +418,28 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         : 'Start → Home'),
               ),
             ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _moveToTrip,
+            icon: const Icon(Icons.folder_outlined),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            label: Text(
+              _ticket.ticketTripId == null ? 'Add to trip' : 'Move to trip',
+            ),
+          ),
+          if (_ticket.ticketTripId != null) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _removeFromTrip,
+              icon: const Icon(Icons.link_off),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              label: const Text('Remove from trip'),
+            ),
+          ],
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: _busy ? null : _deleteTicket,
