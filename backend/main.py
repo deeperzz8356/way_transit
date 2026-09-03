@@ -54,13 +54,15 @@ uploads_root.mkdir(parents=True, exist_ok=True)
 (uploads_root / "tickets").mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(uploads_root)), name="uploads")
 
-from routes import auth, user, search, booking, agent
+from routes import auth, user, search, booking, agent, user_trips, rides
 
 app.include_router(auth.router)
 app.include_router(user.router)
 app.include_router(search.router)
 app.include_router(booking.router)
 app.include_router(agent.router)
+app.include_router(user_trips.router)
+app.include_router(rides.router)
 
 
 @app.get("/")

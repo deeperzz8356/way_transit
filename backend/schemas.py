@@ -279,3 +279,289 @@ class MapRoutePathResponse(BaseModel):
     route_id: int
     mode: str
     stops: list[MapStopResponse]
+
+
+# ─────────────────────────────────────────────
+#  Travel History Schemas
+# ─────────────────────────────────────────────
+
+class UserTripLegCreate(BaseModel):
+    sequence: int = 1
+    transport_mode: str = "other"
+    origin: str
+    destination: str
+    origin_lat: Optional[float] = None
+    origin_lon: Optional[float] = None
+    destination_lat: Optional[float] = None
+    destination_lon: Optional[float] = None
+    distance_km: Optional[float] = 0.0
+    duration_minutes: Optional[int] = 0
+    fare: Optional[float] = 0.0
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    route_name: Optional[str] = None
+    operator_name: Optional[str] = None
+    ticket_reference: Optional[str] = None
+
+
+class UserTripLegResponse(BaseModel):
+    id: int
+    trip_id: int
+    sequence: int
+    transport_mode: str
+    origin: str
+    destination: str
+    origin_lat: Optional[float] = None
+    origin_lon: Optional[float] = None
+    destination_lat: Optional[float] = None
+    destination_lon: Optional[float] = None
+    distance_km: Optional[float] = None
+    duration_minutes: Optional[int] = None
+    fare: Optional[float] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    route_name: Optional[str] = None
+    operator_name: Optional[str] = None
+    ticket_reference: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserTripCreate(BaseModel):
+    origin: str
+    destination: str
+    origin_lat: Optional[float] = None
+    origin_lon: Optional[float] = None
+    destination_lat: Optional[float] = None
+    destination_lon: Optional[float] = None
+    transport_mode: Optional[str] = "other"
+    total_distance_km: Optional[float] = 0.0
+    total_duration_minutes: Optional[int] = 0
+    total_fare: Optional[float] = 0.0
+    currency: Optional[str] = "INR"
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    route_name: Optional[str] = None
+    operator_name: Optional[str] = None
+    ticket_reference: Optional[str] = None
+    num_transfers: Optional[int] = 0
+    status: Optional[str] = "completed"
+    legs: Optional[List[UserTripLegCreate]] = None
+
+
+class UserTripUpdate(BaseModel):
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    transport_mode: Optional[str] = None
+    total_distance_km: Optional[float] = None
+    total_duration_minutes: Optional[int] = None
+    total_fare: Optional[float] = None
+    currency: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    route_name: Optional[str] = None
+    operator_name: Optional[str] = None
+    ticket_reference: Optional[str] = None
+    num_transfers: Optional[int] = None
+    status: Optional[str] = None
+
+
+class UserTripResponse(BaseModel):
+    id: int
+    user_id: int
+    booking_id: Optional[int] = None
+    origin: str
+    destination: str
+    origin_lat: Optional[float] = None
+    origin_lon: Optional[float] = None
+    destination_lat: Optional[float] = None
+    destination_lon: Optional[float] = None
+    transport_mode: Optional[str] = None
+    total_distance_km: Optional[float] = None
+    total_duration_minutes: Optional[int] = None
+    total_fare: Optional[float] = None
+    currency: Optional[str] = "INR"
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    route_name: Optional[str] = None
+    operator_name: Optional[str] = None
+    ticket_reference: Optional[str] = None
+    num_transfers: Optional[int] = None
+    status: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    legs: List[UserTripLegResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+# ─────────────────────────────────────────────
+#  Statistics Schemas
+# ─────────────────────────────────────────────
+
+class TransportModeStats(BaseModel):
+    transport_mode: str
+    trip_count: int
+    total_distance_km: float
+    total_duration_minutes: int
+    total_fare: float
+
+
+class WeeklyStats(BaseModel):
+    week_start: str   # ISO date string (Monday)
+    trip_count: int
+    total_distance_km: float
+    total_fare: float
+
+
+class MonthlyStats(BaseModel):
+    month: str        # "2026-08" format
+    trip_count: int
+    total_distance_km: float
+    total_fare: float
+
+
+class GreenTravelStats(BaseModel):
+    total_co2_kg: float                          # estimated emissions
+    co2_saved_vs_car_kg: float                   # savings compared to driving
+    public_transport_distance_km: float
+    walking_distance_km: float
+    greenest_mode: Optional[str] = None
+    note: str = "Estimated values based on standard emission factors"
+
+
+class TravelStatsOverview(BaseModel):
+    total_trips: int
+    total_distance_km: float
+    total_duration_minutes: int
+    total_fare: float
+    average_distance_km: float
+    average_duration_minutes: float
+    most_used_mode: Optional[str] = None
+    by_mode: List[TransportModeStats] = []
+    weekly: List[WeeklyStats] = []
+    monthly: List[MonthlyStats] = []
+    green: GreenTravelStats
+    period: str = "all_time"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Ride-Booking Schemas (cab / on-demand rides)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RideProductResponse(BaseModel):
+    """A single ride type offered by the active provider."""
+    product_id: str
+    name: str
+    description: str
+    icon: str
+    capacity: int
+    currency: str
+    estimated_fare_min: float
+    estimated_fare_max: float
+    estimated_fare: float
+    estimated_duration_minutes: int
+    estimated_distance_km: float
+
+
+class RideProductsRequest(BaseModel):
+    """Request body for GET /rides/products."""
+    pickup_lat: float = Field(..., ge=-90, le=90)
+    pickup_lon: float = Field(..., ge=-180, le=180)
+    destination_lat: float = Field(..., ge=-90, le=90)
+    destination_lon: float = Field(..., ge=-180, le=180)
+    pickup_address: str = Field(..., min_length=1, max_length=500)
+    destination_address: str = Field(..., min_length=1, max_length=500)
+    provider: str = Field(default="mock", description="Provider slug, e.g. 'mock', 'uber'")
+
+
+class RideProductsResponse(BaseModel):
+    """Response for the products/estimate list endpoint."""
+    provider: str
+    distance_km: float
+    duration_minutes: int
+    routing_source: str           # "ors" | "haversine"
+    products: List[RideProductResponse]
+
+
+class RideBookRequest(BaseModel):
+    """Request body for POST /rides/book."""
+    product_id: str = Field(..., description="e.g. 'mock_economy'")
+    pickup_lat: float = Field(..., ge=-90, le=90)
+    pickup_lon: float = Field(..., ge=-180, le=180)
+    pickup_address: str = Field(..., min_length=1, max_length=500)
+    destination_lat: float = Field(..., ge=-90, le=90)
+    destination_lon: float = Field(..., ge=-180, le=180)
+    destination_address: str = Field(..., min_length=1, max_length=500)
+    payment_method: Optional[str] = Field(
+        default="cash",
+        description="cash | card | upi | wallet",
+    )
+    provider: str = Field(default="mock")
+
+
+class RideStatusHistoryItem(BaseModel):
+    status: str
+    provider_status: Optional[str] = None
+    note: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CabRideResponse(BaseModel):
+    """Full ride detail returned to the Flutter client."""
+    id: int
+    provider: str
+    provider_ride_id: Optional[str] = None
+    status: str
+
+    pickup_lat: float
+    pickup_lon: float
+    pickup_address: str
+    destination_lat: float
+    destination_lon: float
+    destination_address: str
+
+    ride_type: str
+    ride_type_name: Optional[str] = None
+    ride_type_icon: Optional[str] = None
+
+    estimated_fare_min: Optional[float] = None
+    estimated_fare_max: Optional[float] = None
+    estimated_fare: Optional[float] = None
+    currency: str
+    estimated_distance_km: Optional[float] = None
+    estimated_duration_minutes: Optional[int] = None
+
+    actual_fare: Optional[float] = None
+    actual_distance_km: Optional[float] = None
+    actual_duration_minutes: Optional[int] = None
+
+    payment_method: Optional[str] = None
+    cancellation_reason: Optional[str] = None
+
+    requested_at: datetime
+    confirmed_at: Optional[datetime] = None
+    arriving_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    created_at: datetime
+
+    status_history: List[RideStatusHistoryItem] = []
+
+    class Config:
+        from_attributes = True
+
+
+class RideCancelRequest(BaseModel):
+    reason: Optional[str] = Field(
+        default="Cancelled by user",
+        max_length=500,
+    )
+

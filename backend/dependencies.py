@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError
 from sqlalchemy.orm import Session
 from database import SessionLocal
 import crud
@@ -8,7 +8,9 @@ import auth
 import logging
 
 logger = logging.getLogger("way_transit")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
+
+# Simple HTTP Bearer token scheme (not OAuth2)
+security = HTTPBearer()
 
 def get_db():
     db = SessionLocal()
@@ -17,7 +19,8 @@ def get_db():
     finally:
         db.close()
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    token = credentials.credentials
     logger.info(f"Authenticating request with token: {token[:10]}...")
     try:
         payload = auth.decode_access_token(token)

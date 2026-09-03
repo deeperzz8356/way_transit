@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean, Date
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean, Date, Text, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -243,6 +243,8 @@ class User(Base):
     saved_places = relationship("SavedPlace", back_populates="user")
     reward_points = relationship("RewardPoint", back_populates="user")
     wallet = relationship("Wallet", uselist=False, back_populates="user")
+    user_trips = relationship("UserTrip", back_populates="user")
+    cab_rides = relationship("CabRide", back_populates="user", order_by="CabRide.created_at.desc()")
 
 class OTPCode(Base):
     __tablename__ = "otp_codes"
@@ -436,3 +438,253 @@ class Concession(Base):
     requires_id = Column(Boolean, default=False)
 
     operator = relationship("Operator", back_populates="concessions")
+
+
+# ─────────────────────────────────────────────
+#  Travel History Tables
+# ─────────────────────────────────────────────
+
+class UserTrip(Base):
+    """A completed or planned user journey (one or many legs)."""
+    __tablename__ = "user_trips"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # Optional link to a booking that spawned this trip
+    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True, index=True)
+
+    # Overall journey endpoints (plain text – no FK to stops required)
+    origin = Column(String, nullable=False)
+    destination = Column(String, nullable=False)
+    origin_lat = Column(Float, nullable=True)
+    origin_lon = Column(Float, nullable=True)
+    destination_lat = Column(Float, nullable=True)
+    destination_lon = Column(Float, nullable=True)
+
+    # Primary / dominant transport mode for this trip
+    transport_mode = Column(String, nullable=True)   # walking|bus|train|metro|auto|cab|bike|car|other
+
+    # Aggregate totals (summed from legs)
+    total_distance_km = Column(Float, nullable=True, default=0.0)
+    total_duration_minutes = Column(Integer, nullable=True, default=0)
+    total_fare = Column(Float, nullable=True, default=0.0)
+    currency = Column(String, nullable=True, default="INR")
+
+    # Timing
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    # Extra metadata
+    route_name = Column(String, nullable=True)
+    operator_name = Column(String, nullable=True)
+    ticket_reference = Column(String, nullable=True)
+    num_transfers = Column(Integer, nullable=True, default=0)
+
+    # Status: planned | started | completed | cancelled
+    status = Column(String, nullable=False, default="completed", index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="user_trips")
+    booking = relationship("Booking")
+    legs = relationship("UserTripLeg", back_populates="trip", order_by="UserTripLeg.sequence", cascade="all, delete-orphan")
+
+
+class UserTripLeg(Base):
+    """A single transport leg within a UserTrip."""
+    __tablename__ = "user_trip_legs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    trip_id = Column(Integer, ForeignKey("user_trips.id"), nullable=False, index=True)
+
+    sequence = Column(Integer, nullable=False, default=1)       # order of this leg within the trip
+    transport_mode = Column(String, nullable=False, default="other")
+
+    origin = Column(String, nullable=False)
+    destination = Column(String, nullable=False)
+    origin_lat = Column(Float, nullable=True)
+    origin_lon = Column(Float, nullable=True)
+    destination_lat = Column(Float, nullable=True)
+    destination_lon = Column(Float, nullable=True)
+
+    distance_km = Column(Float, nullable=True, default=0.0)
+    duration_minutes = Column(Integer, nullable=True, default=0)
+    fare = Column(Float, nullable=True, default=0.0)
+
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    route_name = Column(String, nullable=True)
+    operator_name = Column(String, nullable=True)
+    ticket_reference = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    trip = relationship("UserTrip", back_populates="legs")
+
+
+# ─────────────────────────────────────────────────────────────────
+#  Ride-Booking Tables  (cab / on-demand rides, separate from
+#  transit ticket "bookings" table above)
+# ─────────────────────────────────────────────────────────────────
+
+class RideProvider(Base):
+    """
+    A registered ride-booking provider (e.g. 'mock', 'uber').
+    Stores metadata and whether the provider is in sandbox mode.
+    The 'config' field holds JSON-serialised, provider-specific
+    settings (base_url, scopes, etc.) — never store secrets here;
+    use environment variables for credentials.
+    """
+    __tablename__ = "ride_providers"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String(50), unique=True, nullable=False, index=True)
+    # e.g. "mock", "uber", "ola", "rapido"
+    display_name = Column(String(100), nullable=False)
+    # e.g. "Mock Provider (Demo)", "Uber"
+    is_active   = Column(Boolean, default=True, nullable=False)
+    is_sandbox  = Column(Boolean, default=True,  nullable=False)
+    # JSON string — non-sensitive config only
+    config      = Column(Text, nullable=True)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cab_rides = relationship("CabRide", back_populates="provider_ref")
+
+
+class CabRide(Base):
+    """
+    A single on-demand cab/ride-booking transaction.
+    Completely separate from the transit 'bookings' table.
+
+    Status lifecycle (internal):
+        REQUESTED → CONFIRMED → ARRIVING → IN_PROGRESS
+                                         → COMPLETED
+                                         → CANCELLED
+                 → FAILED  (if provider rejected the request)
+
+    provider_ride_id: the external ID returned by the provider
+    (None until the provider confirms the booking).
+    """
+    __tablename__ = "cab_rides"
+
+    id   = Column(Integer, primary_key=True, index=True)
+
+    # ── Relations ───────────────────────────────────────────────
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    provider_id = Column(Integer, ForeignKey("ride_providers.id"), nullable=False, index=True)
+
+    # ── Provider reference ───────────────────────────────────────
+    # Internal provider slug kept as a denormalised column so we
+    # can query by provider name without a join.
+    provider    = Column(String(50), nullable=False, index=True)  # "mock", "uber"
+    provider_ride_id = Column(String(255), nullable=True, index=True)
+    # Raw status string from the external provider
+    provider_status  = Column(String(100), nullable=True)
+
+    # ── Pickup ───────────────────────────────────────────────────
+    pickup_lat     = Column(Float, nullable=False)
+    pickup_lon     = Column(Float, nullable=False)
+    pickup_address = Column(String(500), nullable=False)
+
+    # ── Destination ──────────────────────────────────────────────
+    destination_lat     = Column(Float, nullable=False)
+    destination_lon     = Column(Float, nullable=False)
+    destination_address = Column(String(500), nullable=False)
+
+    # ── Ride type / product ──────────────────────────────────────
+    # Provider-specific product ID (e.g. "uberx", "mock_economy")
+    ride_type          = Column(String(100), nullable=False)
+    # Human-readable label returned by the provider
+    ride_type_name     = Column(String(200), nullable=True)
+    # Icon/emoji hint for the Flutter UI (optional)
+    ride_type_icon     = Column(String(50),  nullable=True)
+
+    # ── Estimates (captured at booking time) ─────────────────────
+    estimated_fare_min  = Column(Float, nullable=True)   # lower bound
+    estimated_fare_max  = Column(Float, nullable=True)   # upper bound
+    estimated_fare      = Column(Float, nullable=True)   # midpoint / single
+    currency            = Column(String(10), nullable=False, default="INR")
+    estimated_distance_km      = Column(Float, nullable=True)
+    estimated_duration_minutes = Column(Integer, nullable=True)
+
+    # ── Actuals (filled after ride completes) ────────────────────
+    actual_fare              = Column(Float, nullable=True)
+    actual_distance_km       = Column(Float, nullable=True)
+    actual_duration_minutes  = Column(Integer, nullable=True)
+
+    # ── Internal status ──────────────────────────────────────────
+    # REQUESTED | CONFIRMED | ARRIVING | IN_PROGRESS |
+    # COMPLETED | CANCELLED | FAILED
+    status = Column(
+        String(50),
+        nullable=False,
+        default="REQUESTED",
+        index=True,
+    )
+    cancellation_reason = Column(String(500), nullable=True)
+
+    # ── Payment ──────────────────────────────────────────────────
+    # cash | card | upi | wallet  (may be None if handled by provider)
+    payment_method    = Column(String(50),  nullable=True)
+    payment_reference = Column(String(255), nullable=True)  # provider txn ref
+
+    # ── Timestamps ───────────────────────────────────────────────
+    requested_at  = Column(DateTime, default=datetime.utcnow, nullable=False)
+    confirmed_at  = Column(DateTime, nullable=True)
+    arriving_at   = Column(DateTime, nullable=True)
+    started_at    = Column(DateTime, nullable=True)
+    completed_at  = Column(DateTime, nullable=True)
+    cancelled_at  = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # ── ORM Relationships ────────────────────────────────────────
+    user         = relationship("User",         back_populates="cab_rides")
+    provider_ref = relationship("RideProvider", back_populates="cab_rides")
+    status_history = relationship(
+        "RideStatusHistory",
+        back_populates="cab_ride",
+        order_by="RideStatusHistory.created_at",
+        cascade="all, delete-orphan",
+    )
+
+    # ── Composite indexes ────────────────────────────────────────
+    __table_args__ = (
+        # Fast lookup: all rides for a user, newest first
+        Index("ix_cab_rides_user_created", "user_id", "created_at"),
+        # Fast lookup by provider + external ride ID
+        Index("ix_cab_rides_provider_ext", "provider", "provider_ride_id"),
+        # Note: status already indexed via index=True on the column above
+    )
+
+
+class RideStatusHistory(Base):
+    """
+    Immutable audit log of every status transition for a CabRide.
+    One row is inserted each time the ride status changes so we
+    have a full timeline for debugging and analytics.
+    """
+    __tablename__ = "ride_status_history"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    cab_ride_id = Column(
+        Integer,
+        ForeignKey("cab_rides.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Our internal status at this moment
+    status          = Column(String(50),  nullable=False)
+    # Raw status string from the external provider (may differ)
+    provider_status = Column(String(100), nullable=True)
+    # Free-text note (e.g. cancellation reason, error message)
+    note            = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    cab_ride = relationship("CabRide", back_populates="status_history")
