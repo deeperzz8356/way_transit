@@ -419,10 +419,11 @@ class ApiService {
     throw Exception('Failed to confirm ticket: ${response.body}');
   }
 
-  Future<List<Map<String, dynamic>>> searchStops(String query) async {
+  Future<List<Map<String, dynamic>>> searchStops(String query, {String? mode}) async {
+    final modeParam = (mode != null && mode.isNotEmpty) ? '&mode=$mode' : '';
     final response = await http.get(
       Uri.parse(
-        '$_baseUrl${ApiConfig.searchStops}?q=${Uri.encodeComponent(query)}',
+        '$_baseUrl${ApiConfig.searchStops}?q=${Uri.encodeComponent(query)}$modeParam',
       ),
       headers: _headers,
     );
@@ -431,6 +432,31 @@ class ApiService {
       return data.cast<Map<String, dynamic>>();
     }
     return [];
+  }
+
+  /// POST /search/trips — returns full trip-level timetable results.
+  Future<Map<String, dynamic>> searchTrips({
+    required int sourceStopId,
+    required int destinationStopId,
+    String? mode,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl${ApiConfig.searchTrips}'),
+      headers: _headers,
+      body: json.encode({
+        'source_stop_id': sourceStopId,
+        'destination_stop_id': destinationStopId,
+        if (mode != null && mode.isNotEmpty) 'mode': mode,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    if (response.statusCode == 400 || response.statusCode == 404) {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      throw Exception(body['detail'] ?? 'Search error');
+    }
+    throw Exception('Trip search failed (${response.statusCode}): ${response.body}');
   }
 
   Future<Booking> getTicket(int ticketId) async {

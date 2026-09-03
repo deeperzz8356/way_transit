@@ -189,7 +189,8 @@ def load_metro_excel(db: Session, path: str, city_id: int, operator_id: int):
             name=str(row["name"]),
             lat=float(row["lat"]),
             lon=float(row["lon"]),
-            mode="metro"
+            mode="metro",
+            is_active=True,         # required so GET /search/stops returns them
         )
         db.add(stop)
     db.commit()
@@ -205,7 +206,8 @@ def load_metro_excel(db: Session, path: str, city_id: int, operator_id: int):
             route_code=str(row["route_id"]),
             name=str(row["name"]),
             mode="metro",
-            color_hex=str(row.get("color", ""))
+            color_hex=str(row.get("color", "")),
+            is_active=True,
         )
         db.add(route)
     db.commit()

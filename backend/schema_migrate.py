@@ -113,3 +113,51 @@ def ensure_ticket_schema():
                 conn.execute(text("ALTER TABLE users ADD COLUMN auth_provider VARCHAR"))
             if "updated_at" not in cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN updated_at TIMESTAMP"))
+
+
+def ensure_gtfs_schema():
+    """Add GTFS-specific columns and performance indexes (safe to call multiple times)."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    with engine.begin() as conn:
+        # --- Add gtfs_route_short_name to routes ---
+        if "routes" in tables:
+            rcols = {c["name"] for c in inspector.get_columns("routes")}
+            _add_col(conn, "routes", rcols, "gtfs_route_short_name", "gtfs_route_short_name VARCHAR")
+
+        # --- Create performance indexes (IF NOT EXISTS) ---
+        # Determine dialect: PostgreSQL supports IF NOT EXISTS on CREATE INDEX
+        is_pg = engine.dialect.name == "postgresql"
+
+        def _create_index(conn, idx_name: str, table: str, columns: str):
+            if is_pg:
+                conn.execute(text(
+                    f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({columns})"
+                ))
+            else:
+                # SQLite: wrap in try/except since IF NOT EXISTS isn't supported for indexes in all versions
+                try:
+                    conn.execute(text(
+                        f"CREATE INDEX {idx_name} ON {table} ({columns})"
+                    ))
+                except Exception:
+                    pass  # Index already exists
+
+        if "routes" in tables:
+            _create_index(conn, "ix_routes_route_code_op", "routes", "route_code, operator_id")
+            _create_index(conn, "ix_routes_mode_op", "routes", "mode, operator_id")
+            _create_index(conn, "ix_routes_gtfs_short_name", "routes", "gtfs_route_short_name")
+
+        if "stops" in tables:
+            _create_index(conn, "ix_stops_stop_code_op", "stops", "stop_code, operator_id")
+            _create_index(conn, "ix_stops_mode_op", "stops", "mode, operator_id")
+
+        if "trips" in tables:
+            _create_index(conn, "ix_trips_trip_code", "trips", "trip_code")
+            _create_index(conn, "ix_trips_route_svc", "trips", "route_id, service_id")
+
+        if "stop_times" in tables:
+            _create_index(conn, "ix_stop_times_trip_seq", "stop_times", "trip_id, stop_sequence")
+            _create_index(conn, "ix_stop_times_stop_id", "stop_times", "stop_id")
+

@@ -32,12 +32,15 @@ if DATABASE_URL.startswith("postgresql"):
         with engine.connect():
             pass
     except Exception as exc:
-        warnings.warn(
-            f"PostgreSQL connection failed for DATABASE_URL={DATABASE_URL}. "
-            f"Falling back to SQLite for local startup. Error: {exc}"
-        )
-        DATABASE_URL = "sqlite:///./way_transit.db"
-        engine = _create_engine(DATABASE_URL)
+        # Never silently show data from a different SQLite database when a
+        # PostgreSQL database was explicitly configured.  A failed connection
+        # must stop startup so the issue is visible and the API cannot serve
+        # incomplete fallback data.
+        raise RuntimeError(
+            "PostgreSQL connection failed. The API was not started, so it "
+            "cannot fall back to SQLite and serve the wrong database. "
+            "Check DATABASE_URL, the database host/port, and network access."
+        ) from exc
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 

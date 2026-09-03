@@ -8,7 +8,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../nav/app_nav.dart';
 import '../config/api_config.dart';
-import 'map_screen.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -550,9 +550,15 @@ class _HomeScreenState extends State<HomeScreen> {
               right: 16,
               child: GestureDetector(
                 onTap: () {
+<<<<<<< HEAD
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const MapScreen()));
+=======
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SearchScreen()),
+                  );
+>>>>>>> bdc85f0 (Trains fetched from db on search button)
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(

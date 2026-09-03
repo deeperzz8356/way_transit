@@ -280,6 +280,7 @@ class MapRoutePathResponse(BaseModel):
     mode: str
     stops: list[MapStopResponse]
 
+<<<<<<< HEAD
 
 # ─────────────────────────────────────────────
 #  Travel History Schemas
@@ -508,11 +509,27 @@ class RideStatusHistoryItem(BaseModel):
     provider_status: Optional[str] = None
     note: Optional[str] = None
     created_at: datetime
+=======
+# ---------------------------------------------------------------------------
+# Transit search schemas (Source → Destination)
+# ---------------------------------------------------------------------------
+
+class StopSearchResult(BaseModel):
+    """One stop returned by GET /search/stops."""
+    id: int
+    stop_code: str
+    name: str
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    mode: Optional[str] = None
+    operator_id: Optional[int] = None
+>>>>>>> bdc85f0 (Trains fetched from db on search button)
 
     class Config:
         from_attributes = True
 
 
+<<<<<<< HEAD
 class CabRideResponse(BaseModel):
     """Full ride detail returned to the Flutter client."""
     id: int
@@ -565,3 +582,45 @@ class RideCancelRequest(BaseModel):
         max_length=500,
     )
 
+=======
+class TripSearchRequest(BaseModel):
+    """POST /search/trips request body."""
+    source_stop_id: int
+    destination_stop_id: int
+    mode: Optional[str] = None   # "train" | "bus" | None (any)
+
+
+class TripStopInfo(BaseModel):
+    """Snapshot of a stop inside a search result."""
+    stop_id: int
+    stop_code: str
+    name: str
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    arrival_time: str
+    departure_time: str
+    stop_sequence: int
+
+
+class TripSearchResult(BaseModel):
+    """One matching trip returned by POST /search/trips."""
+    trip_id: int
+    trip_code: str
+    trip_name: str              # trip_short_name (e.g. "99001 Thane - Panvel Local 1")
+    direction: Optional[str]    # "DN" | "UP" | ""
+    route_id: int
+    route_code: str
+    route_name: str
+    mode: str
+    operator_id: Optional[int]
+    operator_name: Optional[str]
+    source: TripStopInfo
+    destination: TripStopInfo
+
+
+class TripSearchResponse(BaseModel):
+    """Wrapper returned by POST /search/trips."""
+    success: bool
+    message: str
+    results: List[TripSearchResult]
+>>>>>>> bdc85f0 (Trains fetched from db on search button)

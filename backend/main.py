@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import logging
+import sys
 from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
@@ -9,6 +10,15 @@ logger = logging.getLogger("way_transit")
 # Load repo-root .env before anything else (OCR / Groq)
 _ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_ROOT / ".env")
+
+# The backend modules use imports such as ``from database import ...``.
+# Uvicorn does not put this directory on sys.path when it is started from the
+# repository root with ``uvicorn backend.main:app --reload``.  Make that
+# supported launch command resolve the local modules exactly as it does when
+# starting from inside ``backend/``.
+_BACKEND_DIR = Path(__file__).resolve().parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,13 +50,21 @@ ensure_ticket_schema()
 
 app = FastAPI(title="WAY Transit API", version="1.0.0", lifespan=lifespan)
 
-# CORS: allow Flutter web (random localhost ports) + Vite
+# CORS — allow all origins (Flutter web dev, Vite, mobile, any localhost port).
+#
+# IMPORTANT: allow_credentials MUST be False when allow_origins=["*"].
+# If credentials=True is combined with wildcard origins, Starlette/browsers
+# silently drop the Access-Control-Allow-Origin header, causing CORS failures.
+# Authentication is handled via Bearer tokens in the Authorization header,
+# not cookies, so credentials=False is correct here.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 uploads_root = Path(__file__).resolve().parent / "uploads"

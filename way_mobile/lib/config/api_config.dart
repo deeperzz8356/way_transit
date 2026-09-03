@@ -39,6 +39,7 @@ class ApiConfig {
   static const String firebaseAuth = '/auth/firebase';
   static const String searchRoutes = '/search/routes';
   static const String searchStops = '/search/stops';
+  static const String searchTrips = '/search/trips';
   static const String bookRoute = '/booking/book';
   static const String myBookings = '/booking/my-bookings';
   static const String wallet = '/booking/wallet';

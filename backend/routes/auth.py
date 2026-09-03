@@ -30,7 +30,9 @@ def _initialize_firebase_app():
             os.getenv('FIREBASE_ADMIN_CREDENTIALS')
             or os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
         )
-        if not cred_path:
+        # A stale environment variable should not prevent the checked-in local
+        # development credential from being used.
+        if not cred_path or not os.path.exists(cred_path):
             # Fallback: look for firebase-admin.json next to this file
             local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'firebase-admin.json')
             if os.path.exists(local_path):
