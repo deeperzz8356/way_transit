@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../nav/app_nav.dart';
 
 class TicketDetailScreen extends StatefulWidget {
@@ -35,8 +36,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   Future<void> _ensureAuth() async {
-    final prefs = await SharedPreferences.getInstance();
-    _api.setToken(prefs.getString('token') ?? 'dev-token');
+    final authService = AuthService(_api);
+    await authService.ensureAuthLoaded();
   }
 
   String _fmt(DateTime? dt) {
@@ -166,17 +167,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         makeActive: true,
       );
       if (!mounted) return;
+      // ✅ Notify all screens that ticket was activated
+      AppNav.notifyTicketActivated();
       // Leave ticket detail → switch to Home tab with active journey UI
       Navigator.of(context).pop();
       AppNav.goHomeAndRefresh();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Active journey on Home')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Active journey on Home')));
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -208,15 +210,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       await _ensureAuth();
       await _api.deleteTicket(_ticket.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ticket deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Ticket deleted')));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -242,8 +243,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             Center(
               child: Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.shade600,
                   borderRadius: BorderRadius.circular(20),
@@ -322,8 +325,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 _busy
                     ? 'Starting…'
                     : (_ticket.activeBadge
-                        ? 'Update Active → Home'
-                        : 'Start → Home'),
+                          ? 'Update Active → Home'
+                          : 'Start → Home'),
               ),
             ),
           const SizedBox(height: 12),
@@ -349,12 +352,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         children: [
           SizedBox(
             width: 100,
-            child: Text(label,
-                style: const TextStyle(color: Colors.black54)),
+            child: Text(label, style: const TextStyle(color: Colors.black54)),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

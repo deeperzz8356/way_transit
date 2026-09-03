@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class AddTicketScreen extends StatefulWidget {
   const AddTicketScreen({super.key});
@@ -49,9 +50,11 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   }
 
   Future<void> _ensureAuth() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    _api.setToken(token ?? 'dev-token');
+    final authService = AuthService(_api);  // ✅ Use _api, not new instance
+    final isLoggedIn = await authService.ensureAuthLoaded();
+    if (!isLoggedIn) {
+      return;
+    }
   }
 
   Color _modeColor(String mode) {

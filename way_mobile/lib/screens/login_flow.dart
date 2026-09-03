@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'main_screen.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
@@ -21,8 +23,37 @@ class _LoginFlowState extends State<LoginFlow> {
   void initState() {
     super.initState();
     _authService = AuthService(_apiService);
+
+    // ✅ IMPORTANT: Check if user is already logged in and restore session
+    // This handles the case where app was closed and reopened
     _checkLoginStatus();
-    // Auto-advance splash screen after vehicle animations complete
+
+    // ✅ FIX: Listen to Firebase auth state changes
+    // This detects when user is authenticated (either by popup/redirect/phone)
+    firebase_auth.FirebaseAuth.instance.authStateChanges().listen((
+      firebase_auth.User? user,
+    ) {
+      if (user != null && mounted) {
+        // User is authenticated via Firebase
+        // Check if they've already set up their profile
+        _authService
+            .getCurrentUser()
+            .then((currentUser) {
+              if (mounted) {
+                // User has a profile - go directly to MainScreen
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const MainScreen()),
+                );
+              }
+            })
+            .catchError((e) {
+              // User doesn't have a profile yet - they'll need to set it up via phone OTP flow
+              print('User profile not found: $e');
+            });
+      }
+    });
+
+    // Auto-advance splash screen after animations complete
     Future.delayed(const Duration(seconds: 9), () {
       if (mounted && _currentStep == LoginStep.splash) {
         setState(() => _currentStep = LoginStep.start);
@@ -45,14 +76,32 @@ class _LoginFlowState extends State<LoginFlow> {
 
   Future<void> _handleGoogleSignIn() async {
     try {
-      await _authService.signInWithGoogle();
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MainScreen()),
+      // Show loading state
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signing in with Google...')),
       );
+
+      await _authService.signInWithGoogle();
+
+      // ✅ FIX: On Web, signInWithRedirect will redirect away
+      // App will come back and authStateChanges() listener will trigger
+      // So we DON'T need to manually navigate here
+
+      // ✅ FIX: Only navigate manually for non-web (mobile)
+      if (!kIsWeb && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google sign-in failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google sign-in failed: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
   }
 
@@ -65,10 +114,13 @@ class _LoginFlowState extends State<LoginFlow> {
           duration: const Duration(milliseconds: 300),
           transitionBuilder: (Widget child, Animation<double> animation) {
             return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 0.2),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+              position:
+                  Tween<Offset>(
+                    begin: const Offset(0.0, 0.2),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                  ),
               child: FadeTransition(opacity: animation, child: child),
             );
           },
@@ -92,7 +144,10 @@ class _LoginFlowState extends State<LoginFlow> {
         return PhoneStep(
           key: const ValueKey('phone'),
           authService: _authService,
-          onVerified: () => _nextStep(LoginStep.profile),
+          onVerified: () {
+            // Phone OTP verified - advance to profile setup
+            _nextStep(LoginStep.profile);
+          },
           onGoogleSignIn: _handleGoogleSignIn,
         );
       case LoginStep.profile:
@@ -128,7 +183,7 @@ class _LoginFlowState extends State<LoginFlow> {
 class PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
-  
+
   const PrimaryButton({super.key, required this.text, required this.onPressed});
 
   @override
@@ -141,10 +196,15 @@ class PrimaryButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
           elevation: 0,
         ),
-        child: Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -153,8 +213,12 @@ class PrimaryButton extends StatelessWidget {
 class SecondaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
-  
-  const SecondaryButton({super.key, required this.text, required this.onPressed});
+
+  const SecondaryButton({
+    super.key,
+    required this.text,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -166,10 +230,15 @@ class SecondaryButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFF4F6FB),
           foregroundColor: const Color(0xFF1A1B35),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
           elevation: 0,
         ),
-        child: Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -186,7 +255,8 @@ class SplashStep extends StatefulWidget {
   State<SplashStep> createState() => _SplashStepState();
 }
 
-class _SplashStepState extends State<SplashStep> with SingleTickerProviderStateMixin {
+class _SplashStepState extends State<SplashStep>
+    with SingleTickerProviderStateMixin {
   late AnimationController _progressController;
 
   @override
@@ -235,7 +305,7 @@ class _SplashStepState extends State<SplashStep> with SingleTickerProviderStateM
                     animation: _progressController,
                     builder: (context, child) {
                       final val = _progressController.value;
-                      
+
                       // Determine image based on progress thirds
                       String imagePath;
                       bool isAuto = false;
@@ -263,8 +333,14 @@ class _SplashStepState extends State<SplashStep> with SingleTickerProviderStateM
                             color: Colors.grey.shade300,
                             alignment: Alignment.center,
                             child: Text(
-                              val < 1.0 / 3.0 ? 'Auto' : (val < 2.0 / 3.0 ? 'Train' : 'Cab'),
-                              style: const TextStyle(fontSize: 8, color: Colors.black, fontWeight: FontWeight.bold),
+                              val < 1.0 / 3.0
+                                  ? 'Auto'
+                                  : (val < 2.0 / 3.0 ? 'Train' : 'Cab'),
+                              style: const TextStyle(
+                                fontSize: 8,
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           );
                         },
@@ -315,9 +391,18 @@ class _SplashStepState extends State<SplashStep> with SingleTickerProviderStateM
                 letterSpacing: 0.5,
               ),
               children: [
-                TextSpan(text: 'multiple transit  ', style: TextStyle(fontWeight: FontWeight.normal)),
-                TextSpan(text: 'one', style: TextStyle(fontWeight: FontWeight.bold)),
-                TextSpan(text: ' app', style: TextStyle(fontWeight: FontWeight.normal)),
+                TextSpan(
+                  text: 'multiple transit  ',
+                  style: TextStyle(fontWeight: FontWeight.normal),
+                ),
+                TextSpan(
+                  text: 'one',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(
+                  text: ' app',
+                  style: TextStyle(fontWeight: FontWeight.normal),
+                ),
               ],
             ),
           ),
@@ -341,36 +426,69 @@ class StartStep extends StatelessWidget {
         children: [
           const SizedBox(height: 24),
           Expanded(
-            child: Image.asset('assets/images/login_screen_image.png', fit: BoxFit.contain),
+            child: Image.asset(
+              'assets/images/login_screen_image.png',
+              fit: BoxFit.contain,
+            ),
           ),
           const SizedBox(height: 32),
-          const Text('Get started', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35))),
+          const Text(
+            'Get started',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A1B35),
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('Designed for seamless journeys ahead.\nBegin the way you prefer.', 
+          const Text(
+            'Designed for seamless journeys ahead.\nBegin the way you prefer.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, color: Color(0xFF8C90A3), height: 1.5),
+            style: TextStyle(
+              fontSize: 15,
+              color: Color(0xFF8C90A3),
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 32),
           PrimaryButton(text: 'Continue with Phone', onPressed: onNext),
           const SizedBox(height: 12),
-          SecondaryButton(text: 'Continue with Gmail', onPressed: onGoogleSignIn ?? onNext),
+          SecondaryButton(
+            text: 'Continue with Gmail',
+            onPressed: onGoogleSignIn ?? onNext,
+          ),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildIconButton(''),
               const SizedBox(width: 16),
-              GestureDetector(onTap: onGoogleSignIn, child: _buildIconButton('G')),
+              GestureDetector(
+                onTap: onGoogleSignIn,
+                child: _buildIconButton('G'),
+              ),
             ],
           ),
           const SizedBox(height: 32),
           TextButton(
             onPressed: onNext,
-            child: const Text('Already a user? Sign in', style: TextStyle(color: Color(0xFF5974FF), fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Already a user? Sign in',
+              style: TextStyle(
+                color: Color(0xFF5974FF),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           TextButton(
             onPressed: onNext,
-            child: const Text('Skip Sign in', style: TextStyle(color: Color(0xFF5974FF), fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Skip Sign in',
+              style: TextStyle(
+                color: Color(0xFF5974FF),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -379,10 +497,21 @@ class StartStep extends StatelessWidget {
 
   Widget _buildIconButton(String symbol) {
     return Container(
-      width: 56, height: 56,
-      decoration: const BoxDecoration(color: Color(0xFFF4F6FB), shape: BoxShape.circle),
+      width: 56,
+      height: 56,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF4F6FB),
+        shape: BoxShape.circle,
+      ),
       alignment: Alignment.center,
-      child: Text(symbol, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35))),
+      child: Text(
+        symbol,
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF1A1B35),
+        ),
+      ),
     );
   }
 }
@@ -405,7 +534,10 @@ class PhoneStep extends StatefulWidget {
 
 class _PhoneStepState extends State<PhoneStep> {
   final TextEditingController _phoneController = TextEditingController();
-  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   bool _otpSent = false;
   bool _isLoading = false;
   String? _statusMessage;
@@ -422,7 +554,9 @@ class _PhoneStepState extends State<PhoneStep> {
   Future<void> _sendOtp() async {
     final phoneText = _phoneController.text.trim();
     if (phoneText.isEmpty) {
-      setState(() => _statusMessage = 'Please enter your phone number.');
+      if (mounted) {
+        setState(() => _statusMessage = 'Please enter your phone number.');
+      }
       return;
     }
 
@@ -431,21 +565,35 @@ class _PhoneStepState extends State<PhoneStep> {
       phone = '+91$phone';
     }
 
-    setState(() {
-      _isLoading = true;
-      _statusMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _statusMessage = null;
+      });
+    }
 
     try {
       await widget.authService.requestPhoneOtp(phone);
-      setState(() {
-        _otpSent = true;
-        _statusMessage = 'OTP sent to $phone. Enter it below.';
-      });
+      if (mounted) {
+        setState(() {
+          _otpSent = true;
+          _statusMessage = 'OTP sent to $phone. Enter it below.';
+        });
+      }
+
+      // Auto-focus on first OTP field
+      if (mounted) {
+        FocusScope.of(context).requestFocus(FocusNode());
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) FocusScope.of(context).requestFocus(FocusNode());
+        });
+      }
     } catch (e) {
-      setState(() {
-        _statusMessage = 'Failed to send OTP: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Failed to send OTP: $e';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -454,9 +602,13 @@ class _PhoneStepState extends State<PhoneStep> {
   }
 
   Future<void> _verifyOtp() async {
-    final otp = _otpControllers.map((controller) => controller.text.trim()).join();
+    final otp = _otpControllers
+        .map((controller) => controller.text.trim())
+        .join();
     if (otp.length != 6) {
-      setState(() => _statusMessage = 'Enter the 6-digit OTP.');
+      if (mounted) {
+        setState(() => _statusMessage = 'Enter the 6-digit OTP.');
+      }
       return;
     }
 
@@ -466,18 +618,22 @@ class _PhoneStepState extends State<PhoneStep> {
       phone = '+91$phone';
     }
 
-    setState(() {
-      _isLoading = true;
-      _statusMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _statusMessage = null;
+      });
+    }
 
     try {
       await widget.authService.verifyPhoneOtp(phone, otp);
       widget.onVerified();
     } catch (e) {
-      setState(() {
-        _statusMessage = 'OTP verification failed: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'OTP verification failed: $e';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -492,15 +648,37 @@ class _PhoneStepState extends State<PhoneStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: Text('Secure Your Account', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35)))),
+          const Center(
+            child: Text(
+              'Secure Your Account',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1B35),
+              ),
+            ),
+          ),
           const SizedBox(height: 40),
-          const Text('Add Your Phone no.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
+          const Text(
+            'Add Your Phone no.',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1B35),
+            ),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(color: const Color(0xFFF4F6FB), borderRadius: BorderRadius.circular(16)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6FB),
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: const Text('+91', style: TextStyle(fontSize: 15)),
               ),
               const SizedBox(width: 12),
@@ -512,8 +690,14 @@ class _PhoneStepState extends State<PhoneStep> {
                     hintText: '000 000 0000',
                     filled: true,
                     fillColor: const Color(0xFFF4F6FB),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                   ),
                 ),
               ),
@@ -521,7 +705,14 @@ class _PhoneStepState extends State<PhoneStep> {
           ),
           const SizedBox(height: 24),
           if (_otpSent) ...[
-            const Text('Enter Otp', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
+            const Text(
+              'Enter Otp',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1B35),
+              ),
+            ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -530,7 +721,10 @@ class _PhoneStepState extends State<PhoneStep> {
             const SizedBox(height: 16),
           ],
           if (_statusMessage != null) ...[
-            Text(_statusMessage!, style: const TextStyle(color: Color(0xFF5974FF))),
+            Text(
+              _statusMessage!,
+              style: const TextStyle(color: Color(0xFF5974FF)),
+            ),
             const SizedBox(height: 16),
           ],
           const Spacer(),
@@ -542,9 +736,15 @@ class _PhoneStepState extends State<PhoneStep> {
           Center(
             child: TextButton(
               onPressed: widget.onGoogleSignIn,
-              child: const Text('Continue with Google', style: TextStyle(color: Color(0xFF5974FF), fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Continue with Google',
+                style: TextStyle(
+                  color: Color(0xFF5974FF),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -554,21 +754,35 @@ class _PhoneStepState extends State<PhoneStep> {
     return Container(
       width: 50,
       height: 50,
-      decoration: BoxDecoration(color: const Color(0xFFF4F6FB), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6FB),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: TextField(
         controller: _otpControllers[index],
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         maxLength: 1,
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        decoration: const InputDecoration(border: InputBorder.none, counterText: ''),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          counterText: '',
+        ),
         onChanged: (value) {
+          // Auto-move to next field when digit is entered
           if (value.length == 1) {
             if (index + 1 < _otpControllers.length) {
+              // Move to next field
               FocusScope.of(context).nextFocus();
             } else {
+              // Last field - hide keyboard
               FocusScope.of(context).unfocus();
             }
+          }
+          // Auto-move back to previous field on backspace
+          if (value.isEmpty && index > 0) {
+            // Move to previous field
+            FocusScope.of(context).previousFocus();
           }
         },
       ),
@@ -580,7 +794,11 @@ class ProfileStep extends StatefulWidget {
   final AuthService authService;
   final VoidCallback onNext;
 
-  const ProfileStep({super.key, required this.authService, required this.onNext});
+  const ProfileStep({
+    super.key,
+    required this.authService,
+    required this.onNext,
+  });
 
   @override
   State<ProfileStep> createState() => _ProfileStepState();
@@ -617,7 +835,9 @@ class _ProfileStepState extends State<ProfileStep> {
   Future<void> _saveProfile() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _statusMessage = 'Please enter your name before continuing.');
+      setState(
+        () => _statusMessage = 'Please enter your name before continuing.',
+      );
       return;
     }
 
@@ -647,7 +867,16 @@ class _ProfileStepState extends State<ProfileStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: Text('Create your Profile', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35)))),
+          const Center(
+            child: Text(
+              'Create your Profile',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1B35),
+              ),
+            ),
+          ),
           const SizedBox(height: 32),
           _buildInputLabel('Your Name'),
           TextField(
@@ -656,18 +885,31 @@ class _ProfileStepState extends State<ProfileStep> {
               hintText: 'Enter your name',
               filled: true,
               fillColor: const Color(0xFFF4F6FB),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
             ),
           ),
           const SizedBox(height: 16),
           const Text(
             'This name will appear in your profile and help personalize your experience.',
-            style: TextStyle(fontSize: 14, color: Color(0xFF8C90A3), height: 1.5),
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF8C90A3),
+              height: 1.5,
+            ),
           ),
           if (_statusMessage != null) ...[
             const SizedBox(height: 16),
-            Text(_statusMessage!, style: const TextStyle(color: Color(0xFF5974FF))),
+            Text(
+              _statusMessage!,
+              style: const TextStyle(color: Color(0xFF5974FF)),
+            ),
           ],
           const Spacer(),
           PrimaryButton(
@@ -682,7 +924,14 @@ class _ProfileStepState extends State<ProfileStep> {
   Widget _buildInputLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, left: 4),
-      child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1A1B35),
+        ),
+      ),
     );
   }
 }
@@ -697,10 +946,21 @@ class PreferencesStep extends StatefulWidget {
 
 class _PreferencesStepState extends State<PreferencesStep> {
   final List<String> allPreferences = [
-    'Solo Traveller', 'Group Traveller', 'Adventure', 'Explorer', 
-    'Metro', 'Walking', 'Bus', 'Train', 'Fastest Route', 
-    'Shortest Route', 'Carpool', 'Multimodal', 'Single Trips', 
-    'Budget Trips', 'Comfort Trips'
+    'Solo Traveller',
+    'Group Traveller',
+    'Adventure',
+    'Explorer',
+    'Metro',
+    'Walking',
+    'Bus',
+    'Train',
+    'Fastest Route',
+    'Shortest Route',
+    'Carpool',
+    'Multimodal',
+    'Single Trips',
+    'Budget Trips',
+    'Comfort Trips',
   ];
   final Set<String> selectedPrefs = {};
 
@@ -711,12 +971,22 @@ class _PreferencesStepState extends State<PreferencesStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: Text('Select Travel Preferences', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35)))),
+          const Center(
+            child: Text(
+              'Select Travel Preferences',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1B35),
+              ),
+            ),
+          ),
           const SizedBox(height: 32),
           Expanded(
             child: SingleChildScrollView(
               child: Wrap(
-                spacing: 12, runSpacing: 12,
+                spacing: 12,
+                runSpacing: 12,
                 children: allPreferences.map((pref) {
                   final isActive = selectedPrefs.contains(pref);
                   return GestureDetector(
@@ -730,16 +1000,31 @@ class _PreferencesStepState extends State<PreferencesStep> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isActive ? const Color(0xFFEBF0FF) : const Color(0xFFF4F6FB),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: isActive ? const Color(0xFF5974FF) : Colors.transparent),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
                       ),
-                      child: Text(pref, style: TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600,
-                        color: isActive ? const Color(0xFF5974FF) : const Color(0xFF8C90A3),
-                      )),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? const Color(0xFFEBF0FF)
+                            : const Color(0xFFF4F6FB),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: isActive
+                              ? const Color(0xFF5974FF)
+                              : Colors.transparent,
+                        ),
+                      ),
+                      child: Text(
+                        pref,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isActive
+                              ? const Color(0xFF5974FF)
+                              : const Color(0xFF8C90A3),
+                        ),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -765,22 +1050,48 @@ class FinalStep extends StatelessWidget {
         children: [
           const SizedBox(height: 40),
           Expanded(
-            child: Image.asset('assets/images/login_screen_image.png', fit: BoxFit.contain),
+            child: Image.asset(
+              'assets/images/login_screen_image.png',
+              fit: BoxFit.contain,
+            ),
           ),
           const SizedBox(height: 32),
-          const Text('Find Your Way!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35))),
+          const Text(
+            'Find Your Way!',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A1B35),
+            ),
+          ),
           const Spacer(),
           PrimaryButton(text: 'Get Started!', onPressed: onFinish),
           const SizedBox(height: 16),
           RichText(
             textAlign: TextAlign.center,
             text: const TextSpan(
-              style: TextStyle(fontSize: 12, color: Color(0xFF8C90A3), height: 1.5),
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF8C90A3),
+                height: 1.5,
+              ),
               children: [
                 TextSpan(text: 'By using WAY Transit, you agree to the\n'),
-                TextSpan(text: 'Terms', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A1B35))),
+                TextSpan(
+                  text: 'Terms',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1B35),
+                  ),
+                ),
                 TextSpan(text: ' and '),
-                TextSpan(text: 'Privacy Policy.', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A1B35))),
+                TextSpan(
+                  text: 'Privacy Policy.',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1B35),
+                  ),
+                ),
               ],
             ),
           ),

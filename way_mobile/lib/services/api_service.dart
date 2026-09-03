@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../config/api_config.dart';
 import '../models/user.dart';
 import '../models/route.dart';
 import '../models/booking.dart';
+import '../models/ride.dart';
+import '../models/user_trip.dart';
 
 class TicketUploadResult {
   final int jobId;
@@ -57,15 +60,25 @@ class ApiService {
     return headers;
   }
 
+  /// Get current Firebase ID token if user is logged in
+  Future<String?> getFirebaseIdToken() async {
+    try {
+      final user = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        return await user.getIdToken();
+      }
+    } catch (_) {
+      // Silently fail
+    }
+    return null;
+  }
+
   // Authentication
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await http.post(
       Uri.parse('$_baseUrl${ApiConfig.login}'),
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {
-        'username': email,
-        'password': password,
-      },
+      body: {'username': email, 'password': password},
     );
 
     if (response.statusCode == 200) {
@@ -76,7 +89,11 @@ class ApiService {
   }
 
   // OAuth-style login (development helper)
-  Future<Map<String, dynamic>> oauthLogin({required String provider, required String email, String? providerId}) async {
+  Future<Map<String, dynamic>> oauthLogin({
+    required String provider,
+    required String email,
+    String? providerId,
+  }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/user/oauth_login'),
       headers: {'Content-Type': 'application/json'},
@@ -135,10 +152,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse('$_baseUrl${ApiConfig.signup}'),
       headers: _headers,
-      body: json.encode({
-        'email': email,
-        'password': password,
-      }),
+      body: json.encode({'email': email, 'password': password}),
     );
 
     if (response.statusCode == 200) {
@@ -164,7 +178,9 @@ class ApiService {
   // Search
   Future<List<Route>> searchRoutes(String source, String destination) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl${ApiConfig.searchRoutes}?source=$source&destination=$destination'),
+      Uri.parse(
+        '$_baseUrl${ApiConfig.searchRoutes}?source=$source&destination=$destination',
+      ),
       headers: _headers,
     );
 
@@ -217,7 +233,9 @@ class ApiService {
       headers: _headers,
     );
     if (response.statusCode == 200) {
-      return WalletData.fromJson(json.decode(response.body) as Map<String, dynamic>);
+      return WalletData.fromJson(
+        json.decode(response.body) as Map<String, dynamic>,
+      );
     }
     throw Exception('Failed to get wallet: ${response.body}');
   }
@@ -274,10 +292,10 @@ class ApiService {
     final contentType = lower.endsWith('.png')
         ? 'image/png'
         : lower.endsWith('.webp')
-            ? 'image/webp'
-            : lower.endsWith('.gif')
-                ? 'image/gif'
-                : 'image/jpeg';
+        ? 'image/webp'
+        : lower.endsWith('.gif')
+        ? 'image/gif'
+        : 'image/jpeg';
 
     request.files.add(
       http.MultipartFile.fromBytes(
@@ -291,7 +309,9 @@ class ApiService {
     final streamed = await request.send();
     final body = await streamed.stream.bytesToString();
     if (streamed.statusCode == 200 || streamed.statusCode == 201) {
-      return TicketUploadResult.fromJson(json.decode(body) as Map<String, dynamic>);
+      return TicketUploadResult.fromJson(
+        json.decode(body) as Map<String, dynamic>,
+      );
     }
     throw Exception('Upload failed (${streamed.statusCode}): $body');
   }
@@ -490,5 +510,266 @@ class ApiService {
       return UserPassItem.fromJson(json.decode(response.body));
     }
     throw Exception('Failed to add pass: ${response.body}');
+  }
+
+  // ─── Ride Booking ───────────────────────────────────────────
+
+  /// Search available rides
+  Future<List<Ride>> searchRides({
+    required String source,
+    required String destination,
+    String? vehicleType,
+  }) async {
+    final params = {
+      'source': source,
+      'destination': destination,
+      if (vehicleType != null) 'vehicle_type': vehicleType,
+    };
+    final uri = Uri.parse(
+      '$_baseUrl/rides/search',
+    ).replace(queryParameters: params);
+    final response = await http.get(uri, headers: _headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((e) => Ride.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    throw Exception('Failed to search rides: ${response.body}');
+  }
+
+  /// Book a ride
+  Future<Ride> bookRide({
+    required int rideId,
+    required String source,
+    required String destination,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/rides/$rideId/book'),
+      headers: _headers,
+      body: json.encode({'source': source, 'destination': destination}),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Ride.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to book ride: ${response.body}');
+  }
+
+  /// Get active ride
+  Future<Ride> getActiveRide() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/rides/active'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return Ride.fromJson(json.decode(response.body));
+    }
+    throw Exception('No active ride: ${response.body}');
+  }
+
+  /// Get my rides (booking history)
+  Future<List<Ride>> getMyRides({String? status}) async {
+    final params = <String, String>{};
+    if (status != null && status.isNotEmpty) params['status'] = status;
+
+    final uri = Uri.parse(
+      '$_baseUrl/rides/my-rides',
+    ).replace(queryParameters: params);
+    final response = await http.get(uri, headers: _headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((e) => Ride.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    throw Exception('Failed to get rides: ${response.body}');
+  }
+
+  /// Cancel a ride
+  Future<void> cancelRide(int rideId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/rides/$rideId/cancel'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to cancel ride: ${response.body}');
+    }
+  }
+
+  /// Rate a completed ride
+  Future<void> rateRide(int rideId, double rating, String? comment) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/rides/$rideId/rate'),
+      headers: _headers,
+      body: json.encode({'rating': rating, 'comment': comment}),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to rate ride: ${response.body}');
+    }
+  }
+
+  // ─── Travel History & Statistics ────────────────────────────
+
+  /// Get user's trips with optional filters
+  Future<List<UserTrip>> getTrips({
+    String? status,
+    String? transportMode,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final params = <String, String>{
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+    };
+    if (status != null && status != 'all') params['status'] = status;
+    if (transportMode != null && transportMode != 'all') {
+      params['transport_mode'] = transportMode;
+    }
+    if (dateFrom != null) params['date_from'] = dateFrom.toIso8601String();
+    if (dateTo != null) params['date_to'] = dateTo.toIso8601String();
+
+    final uri = Uri.parse('$_baseUrl/trips').replace(queryParameters: params);
+    final response = await http.get(uri, headers: _headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data
+          .map((e) => UserTrip.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw Exception('Failed to get trips: ${response.body}');
+  }
+
+  /// Get a single trip detail
+  Future<UserTrip> getTrip(int tripId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/trips/$tripId'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return UserTrip.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to get trip: ${response.body}');
+  }
+
+  /// Create a manual trip (walking, manual entry, etc.)
+  Future<UserTrip> createTrip({
+    required String origin,
+    required String destination,
+    double? originLat,
+    double? originLon,
+    double? destinationLat,
+    double? destinationLon,
+    String? transportMode,
+    double? totalDistanceKm,
+    int? totalDurationMinutes,
+    double? totalFare,
+    DateTime? startedAt,
+    DateTime? completedAt,
+    String? routeName,
+    String? operatorName,
+    String? ticketReference,
+    int? numTransfers,
+    String status = 'completed',
+    List<Map<String, dynamic>>? legs,
+  }) async {
+    final body = {
+      'origin': origin,
+      'destination': destination,
+      'transport_mode': transportMode,
+      'total_distance_km': totalDistanceKm,
+      'total_duration_minutes': totalDurationMinutes,
+      'total_fare': totalFare,
+      'started_at': startedAt?.toIso8601String(),
+      'completed_at': completedAt?.toIso8601String(),
+      'route_name': routeName,
+      'operator_name': operatorName,
+      'ticket_reference': ticketReference,
+      'num_transfers': numTransfers,
+      'status': status,
+      if (originLat != null) 'origin_lat': originLat,
+      if (originLon != null) 'origin_lon': originLon,
+      if (destinationLat != null) 'destination_lat': destinationLat,
+      if (destinationLon != null) 'destination_lon': destinationLon,
+      if (legs != null) 'legs': legs,
+    };
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/trips'),
+      headers: _headers,
+      body: json.encode(body),
+    );
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return UserTrip.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to create trip: ${response.body}');
+  }
+
+  /// Update a trip
+  Future<UserTrip> updateTrip(
+    int tripId, {
+    String? origin,
+    String? destination,
+    String? transportMode,
+    double? totalDistanceKm,
+    int? totalDurationMinutes,
+    double? totalFare,
+    String? status,
+  }) async {
+    final body = <String, dynamic>{};
+    if (origin != null) body['origin'] = origin;
+    if (destination != null) body['destination'] = destination;
+    if (transportMode != null) body['transport_mode'] = transportMode;
+    if (totalDistanceKm != null) body['total_distance_km'] = totalDistanceKm;
+    if (totalDurationMinutes != null) {
+      body['total_duration_minutes'] = totalDurationMinutes;
+    }
+    if (totalFare != null) body['total_fare'] = totalFare;
+    if (status != null) body['status'] = status;
+
+    final response = await http.put(
+      Uri.parse('$_baseUrl/trips/$tripId'),
+      headers: _headers,
+      body: json.encode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return UserTrip.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to update trip: ${response.body}');
+  }
+
+  /// Delete a trip
+  Future<void> deleteTrip(int tripId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/trips/$tripId'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to delete trip: ${response.body}');
+    }
+  }
+
+  /// Get travel statistics
+  Future<TravelStatsOverview> getTravelStats({
+    String period = 'all_time',
+  }) async {
+    final params = {'period': period};
+    final uri = Uri.parse(
+      '$_baseUrl/stats/overview',
+    ).replace(queryParameters: params);
+    final response = await http.get(uri, headers: _headers);
+
+    if (response.statusCode == 200) {
+      return TravelStatsOverview.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to get travel stats: ${response.body}');
   }
 }

@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../nav/app_nav.dart';
 import 'ticket_detail_screen.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -39,13 +41,24 @@ class _WalletScreenState extends State<WalletScreen>
         _statusTab = ['active', 'used', 'expired', 'all'][_statusTabs.index];
       });
     });
+
+    // ✅ Listen to ticket activation events
+    AppNav.ticketActivated.addListener(_onTicketActivated);
+
     _loadCachedThenFetch();
   }
 
   @override
   void dispose() {
     _statusTabs.dispose();
+    AppNav.ticketActivated.removeListener(_onTicketActivated);
     super.dispose();
+  }
+
+  // ✅ Auto-refresh when a ticket is activated
+  void _onTicketActivated() {
+    print('🔄 Ticket activated! Refreshing wallet...');
+    _fetchWallet();
   }
 
   Color _colorFor(String? hex, String? mode) {
@@ -82,8 +95,16 @@ class _WalletScreenState extends State<WalletScreen>
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      _api.setToken(token ?? 'dev-token');
+      final authService = AuthService(_api); // ✅ Use _api, not new instance
+      final isLoggedIn = await authService.ensureAuthLoaded();
+
+      if (!isLoggedIn) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please log in first')));
+        return;
+      }
 
       final wallet = await _api.getWallet(
         mode: _modeFilter == 'all' ? null : _modeFilter,
@@ -141,21 +162,30 @@ class _WalletScreenState extends State<WalletScreen>
 
   Future<void> _addDemoPass() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _api.setToken(prefs.getString('token') ?? 'dev-token');
+      final authService = AuthService(_api); // ✅ Use _api
+      final isLoggedIn = await authService.ensureAuthLoaded();
+
+      if (!isLoggedIn) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Please log in first')));
+        }
+        return;
+      }
       final products = await _api.listPassProducts();
       if (products.isEmpty) return;
       await _api.addPassToWallet(products.first.passId);
       await _fetchWallet();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pass added to wallet')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Pass added to wallet')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not add pass: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not add pass: $e')));
     }
   }
 
@@ -170,10 +200,7 @@ class _WalletScreenState extends State<WalletScreen>
             tooltip: 'Add pass',
             icon: const Icon(Icons.card_membership),
           ),
-          IconButton(
-            onPressed: _fetchWallet,
-            icon: const Icon(Icons.refresh),
-          ),
+          IconButton(onPressed: _fetchWallet, icon: const Icon(Icons.refresh)),
         ],
         bottom: TabBar(
           controller: _statusTabs,
@@ -214,59 +241,66 @@ class _WalletScreenState extends State<WalletScreen>
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null && _tickets.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('Error: $_error',
-                                  textAlign: TextAlign.center),
-                              const SizedBox(height: 12),
-                              ElevatedButton(
-                                onPressed: _fetchWallet,
-                                child: const Text('Retry'),
-                              ),
-                            ],
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Error: $_error', textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: _fetchWallet,
+                            child: const Text('Retry'),
                           ),
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _fetchWallet,
-                        child: ListView(
-                          padding: const EdgeInsets.all(16),
-                          children: [
-                            if (_passes.isNotEmpty) ...[
-                              const Text('Passes',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              ..._passes.map(_buildPassCard),
-                              const SizedBox(height: 16),
-                              const Text('Tickets',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                            ],
-                            if (_filteredTickets.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 48),
-                                child: Center(
-                                  child: Text(
-                                    'No tickets in this view.\nAdd a ticket to get started!',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        fontSize: 16, color: Colors.grey),
-                                  ),
-                                ),
-                              )
-                            else
-                              ..._filteredTickets.map(_buildTicketCard),
-                          ],
-                        ),
+                        ],
                       ),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchWallet,
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        if (_passes.isNotEmpty) ...[
+                          const Text(
+                            'Passes',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ..._passes.map(_buildPassCard),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Tickets',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        if (_filteredTickets.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 48),
+                            child: Center(
+                              child: Text(
+                                'No tickets in this view.\nAdd a ticket to get started!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ..._filteredTickets.map(_buildTicketCard),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
@@ -283,8 +317,10 @@ class _WalletScreenState extends State<WalletScreen>
           borderRadius: BorderRadius.circular(4),
         ),
         child: ListTile(
-          title: Text(pass.name ?? 'Pass',
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(
+            pass.name ?? 'Pass',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           subtitle: Text(
             '${(pass.modeCoverage ?? 'other').toUpperCase()} · ${pass.status}'
             '${pass.validUntil != null ? ' · until ${pass.validUntil!.toLocal().toString().split(' ').first}' : ''}',
@@ -327,20 +363,29 @@ class _WalletScreenState extends State<WalletScreen>
       },
       onDismissed: (_) async {
         try {
-          final prefs = await SharedPreferences.getInstance();
-          _api.setToken(prefs.getString('token') ?? 'dev-token');
+          final authService = AuthService(_api);
+          final isLoggedIn = await authService.ensureAuthLoaded();
+
+          if (!isLoggedIn) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please log in first')),
+            );
+            return;
+          }
           await _api.deleteTicket(ticket.id);
           if (!mounted) return;
           setState(() {
             _tickets.removeWhere((t) => t.id == ticket.id);
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ticket deleted')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Ticket deleted')));
         } catch (e) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('$e')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
           _fetchWallet();
         }
       },
@@ -355,157 +400,172 @@ class _WalletScreenState extends State<WalletScreen>
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       child: Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: ticket.activeBadge ? 6 : 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => TicketDetailScreen(ticket: ticket),
-            ),
-          );
-          _fetchWallet();
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: ticket.activeBadge ? Colors.green.shade600 : color,
-                width: 6,
+        margin: const EdgeInsets.only(bottom: 16),
+        elevation: ticket.activeBadge ? 6 : 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => TicketDetailScreen(ticket: ticket),
               ),
+            );
+            _fetchWallet();
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: ticket.activeBadge ? Colors.green.shade600 : color,
+                  width: 6,
+                ),
+              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            (ticket.modeLabel ?? ticket.mode ?? 'Other')
-                                .toUpperCase(),
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        if (ticket.activeBadge)
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: Colors.green.shade600,
+                              color: color.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              'ACTIVE',
+                            child: Text(
+                              (ticket.modeLabel ?? ticket.mode ?? 'Other')
+                                  .toUpperCase(),
                               style: TextStyle(
-                                color: Colors.white,
+                                color: color,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                      ],
+                          if (ticket.activeBadge)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade600,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'ACTIVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Delete ticket',
-                    onPressed: () => _confirmDelete(ticket),
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _routeLabel(ticket),
-                          style: const TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
+                    IconButton(
+                      tooltip: 'Delete ticket',
+                      onPressed: () => _confirmDelete(ticket),
+                      icon: const Icon(Icons.delete_forever, color: Colors.red),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _routeLabel(ticket),
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
                             ticket.activeBadge
                                 ? 'Status: ACTIVE JOURNEY'
                                 : 'Status: ${ticket.status}',
                             style: TextStyle(
-                                color: ticket.activeBadge
-                                    ? Colors.green.shade700
-                                    : ticket.status == 'USED'
-                                        ? Colors.grey
-                                        : Colors.green,
-                                fontWeight: FontWeight.w600)),
-                        if (ticket.journeyStartedAt != null)
-                          Text(
-                            'Start: ${ticket.journeyStartedAt!.toLocal().toString().substring(0, 16)}',
-                            style: const TextStyle(
-                                color: Colors.black54, fontSize: 12),
+                              color: ticket.activeBadge
+                                  ? Colors.green.shade700
+                                  : ticket.status == 'USED'
+                                  ? Colors.grey
+                                  : Colors.green,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        if (ticket.journeyEstimatedEndAt != null)
+                          if (ticket.journeyStartedAt != null)
+                            Text(
+                              'Start: ${ticket.journeyStartedAt!.toLocal().toString().substring(0, 16)}',
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          if (ticket.journeyEstimatedEndAt != null)
+                            Text(
+                              'Est. end: ${ticket.journeyEstimatedEndAt!.toLocal().toString().substring(0, 16)}',
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          if (ticket.ticketNumber != null &&
+                              ticket.ticketNumber!.isNotEmpty)
+                            Text(
+                              'No: ${ticket.ticketNumber}',
+                              style: const TextStyle(color: Colors.black54),
+                            ),
                           Text(
-                            'Est. end: ${ticket.journeyEstimatedEndAt!.toLocal().toString().substring(0, 16)}',
-                            style: const TextStyle(
-                                color: Colors.black54, fontSize: 12),
+                            'Added: ${ticket.bookedAt != null ? ticket.bookedAt!.toLocal().toString().split(' ').first : 'N/A'}',
+                            style: const TextStyle(color: Colors.grey),
                           ),
-                        if (ticket.ticketNumber != null &&
-                            ticket.ticketNumber!.isNotEmpty)
-                          Text('No: ${ticket.ticketNumber}',
-                              style: const TextStyle(color: Colors.black54)),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      children: [
+                        QrImageView(
+                          data: ticket.displayQr,
+                          version: QrVersions.auto,
+                          size: 80,
+                        ),
                         Text(
-                          'Added: ${ticket.bookedAt != null ? ticket.bookedAt!.toLocal().toString().split(' ').first : 'N/A'}',
-                          style: const TextStyle(color: Colors.grey),
+                          ticket.displayQr.length > 8
+                              ? ticket.displayQr.substring(0, 8).toUpperCase()
+                              : ticket.displayQr.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  Column(
-                    children: [
-                      QrImageView(
-                        data: ticket.displayQr,
-                        version: QrVersions.auto,
-                        size: 80,
-                      ),
-                      Text(
-                        ticket.displayQr.length > 8
-                            ? ticket.displayQr.substring(0, 8).toUpperCase()
-                            : ticket.displayQr.toUpperCase(),
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontFamily: 'monospace',
-                            color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -530,18 +590,25 @@ class _WalletScreenState extends State<WalletScreen>
     );
     if (ok != true) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _api.setToken(prefs.getString('token') ?? 'dev-token');
+      final authService = AuthService(_api);
+      final isLoggedIn = await authService.ensureAuthLoaded();
+
+      if (!isLoggedIn) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please log in first')));
+        return;
+      }
       await _api.deleteTicket(ticket.id);
       if (!mounted) return;
       setState(() => _tickets.removeWhere((t) => t.id == ticket.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ticket deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Ticket deleted')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       _fetchWallet();
     }
   }

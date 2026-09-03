@@ -30,11 +30,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    super.initState();
     _authService = AuthService(_api);
-    _userFuture = _authService.getCurrentUser();
+    // ✅ FIX: Load token first, THEN load user data
+    _userFuture = _loadUserWithToken();
     _fetchActiveTicket();
     AppNav.homeRefreshTick.addListener(_onHomeRefresh);
+  }
+
+  Future<User> _loadUserWithToken() async {
+    // Ensure token is loaded on API service first
+    await _authService.ensureAuthLoaded();
+    return await _authService.getCurrentUser();
   }
 
   @override
@@ -50,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchActiveTicket() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      final token = prefs.getString('auth_token');
       _api.setToken(token ?? 'dev-token');
 
       final bookings = await _api.getMyBookings();
@@ -200,7 +206,9 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
 
-        final greetingText = greetingName.isNotEmpty ? 'Hello $greetingName!' : 'Hello!';
+        final greetingText = greetingName.isNotEmpty
+            ? 'Hello $greetingName!'
+            : 'Hello!';
 
         return Padding(
           padding: const EdgeInsets.all(20.0),
@@ -255,9 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      child: Center(
-        child: Text(emoji, style: const TextStyle(fontSize: 20)),
-      ),
+      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 20))),
     );
   }
 
@@ -279,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: color.withOpacity(0.3),
+                  color: color.withValues(alpha: 0.3),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
@@ -292,9 +298,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.22),
+                        color: Colors.white.withValues(alpha: 0.22),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
@@ -372,7 +380,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _bentoTile(
                   icon: Icons.payments_outlined,
                   label: 'Fare',
-                  value: t.fare != null ? '₹${t.fare!.toStringAsFixed(0)}' : '—',
+                  value: t.fare != null
+                      ? '₹${t.fare!.toStringAsFixed(0)}'
+                      : '—',
                 ),
               ),
             ],
@@ -402,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -416,12 +426,17 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 11, color: Colors.black45)),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700)),
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, color: Colors.black45),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
@@ -444,8 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
           point: _fromPoint!,
           width: 40,
           height: 40,
-          child:
-              const Icon(Icons.trip_origin, color: Colors.green, size: 32),
+          child: const Icon(Icons.trip_origin, color: Colors.green, size: 32),
         ),
       );
     }
@@ -512,10 +526,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 left: 12,
                 right: 12,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -534,13 +550,15 @@ class _HomeScreenState extends State<HomeScreen> {
               right: 16,
               child: GestureDetector(
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const MapScreen()),
-                  );
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const MapScreen()));
                 },
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -616,10 +634,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 4),
                       Text(
                         "19'Mar'26 | 11:36",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -730,7 +745,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF4F6FB),
                     borderRadius: BorderRadius.circular(12),
@@ -766,10 +784,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 const Text(
                   'Saved',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF8C90A3),
-                  ),
+                  style: TextStyle(fontSize: 14, color: Color(0xFF8C90A3)),
                 ),
               ],
             ),
@@ -781,7 +796,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const LinearProgressIndicator(
                     value: 0.6,
                     backgroundColor: Color(0xFFF4F6FB),
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5974FF)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF5974FF),
+                    ),
                     minHeight: 8,
                   ),
                 ),
@@ -791,17 +808,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: const [
                     Text(
                       'Trips',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF8C90A3),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF8C90A3)),
                     ),
                     Text(
                       'Reward',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF8C90A3),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF8C90A3)),
                     ),
                   ],
                 ),
@@ -823,10 +834,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: const Text(
                   'Check Travel History ↗',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -868,10 +876,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Expanded(
                     child: Text(
                       'Recommendations For You....',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF8C90A3),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF8C90A3)),
                     ),
                   ),
                   Container(
@@ -912,10 +917,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '14 May, 2026 | 4.2 ★',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(

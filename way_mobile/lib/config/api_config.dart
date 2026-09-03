@@ -55,6 +55,13 @@ class ApiConfig {
   static String completeJourney(int id) => '/booking/tickets/$id/complete';
   static String addPass(int passId) => '/booking/passes/$passId/add';
 
+  // Travel History & Statistics
+  static const String trips = '/trips';
+  static const String statsOverview = '/stats/overview';
+  static String tripDetail(int id) => '/trips/$id';
+  static String deleteTrip(int id) => '/trips/$id';
+  static String updateTrip(int id) => '/trips/$id';
+
   static String resolveUrl(String pathOrUrl) {
     if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
       return pathOrUrl;
