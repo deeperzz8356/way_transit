@@ -144,7 +144,50 @@ def _ticket_kwargs_from_body(data) -> dict:
         "class_name": getattr(data, "class_name", None),
         "fare": getattr(data, "fare", None),
         "source_type": getattr(data, "source_type", None) or "manual",
+        "ticket_trip_id": getattr(data, "ticket_trip_id", None),
     }
+
+
+def _trip_response(trip: models.TicketTrip, mode: Optional[str] = None) -> schemas.TicketTripResponse:
+    mode_n = normalize_mode(mode) if mode and mode != "all" else None
+    tickets = list(trip.tickets or [])
+    if mode_n:
+        tickets = [t for t in tickets if t.mode == mode_n]
+    tickets.sort(key=lambda t: t.booked_at or datetime.min, reverse=True)
+    return schemas.TicketTripResponse(
+        id=trip.id,
+        user_id=trip.user_id,
+        name=trip.name,
+        notes=trip.notes,
+        travel_date=trip.travel_date,
+        ticket_count=len(tickets),
+        tickets=tickets,
+        created_at=trip.created_at,
+        updated_at=trip.updated_at,
+    )
+
+
+def _pass_responses(passes) -> list[schemas.UserPassResponse]:
+    pass_out = []
+    for up in passes:
+        product = up.pass_product
+        mode_c = normalize_mode(product.mode_coverage if product else None)
+        op_color = None
+        if product and product.operator:
+            op_color = product.operator.color_hex
+        pass_out.append(
+            schemas.UserPassResponse(
+                id=up.id,
+                pass_id=up.pass_id,
+                name=product.name if product else None,
+                mode_coverage=mode_c,
+                color_hex=color_for_mode(mode_c, op_color),
+                valid_until=up.valid_until,
+                status=up.status,
+                price=product.price if product else None,
+            )
+        )
+    return pass_out
 
 
 @router.post("/add-ticket", response_model=schemas.BookingResponse)
@@ -163,7 +206,10 @@ def add_ticket(
             status_code=409,
             detail={"message": "Already in wallet", "booking_id": dup.id},
         )
-    return crud.create_unified_ticket(db=db, user_id=user_id, **kwargs)
+    try:
+        return crud.create_unified_ticket(db=db, user_id=user_id, **kwargs)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/upload-ticket", response_model=schemas.TicketUploadResponse)
@@ -285,21 +331,25 @@ def confirm_ticket_job(
             detail={"message": "Already in wallet", "booking_id": dup.id},
         )
 
-    booking = crud.create_unified_ticket(
-        db=db,
-        user_id=user_id,
-        source=data.source,
-        destination=data.destination,
-        image_url=job.image_url,
-        ticket_number=ticket_number,
-        qr_payload=qr_payload,
-        mode=mode,
-        operator_name=operator_name,
-        travel_date=data.travel_date or job.travel_date,
-        class_name=data.class_name,
-        fare=data.fare,
-        source_type="scan",
-    )
+    try:
+        booking = crud.create_unified_ticket(
+            db=db,
+            user_id=user_id,
+            source=data.source,
+            destination=data.destination,
+            image_url=job.image_url,
+            ticket_number=ticket_number,
+            qr_payload=qr_payload,
+            mode=mode,
+            operator_name=operator_name,
+            travel_date=data.travel_date or job.travel_date,
+            class_name=data.class_name,
+            fare=data.fare,
+            source_type="scan",
+            ticket_trip_id=data.ticket_trip_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     crud.update_ticket_ingest_job(
         db,
         job,
@@ -333,7 +383,14 @@ def get_my_bookings(
     user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    tickets, _ = crud.get_user_wallet(db, user_id=user_id, mode=mode)
+    ungrouped, trips, _ = crud.get_user_wallet(db, user_id=user_id, mode=mode)
+    mode_n = normalize_mode(mode) if mode and mode != "all" else None
+    tickets = list(ungrouped)
+    for trip in trips:
+        for t in trip.tickets or []:
+            if mode_n is None or t.mode == mode_n:
+                tickets.append(t)
+    tickets.sort(key=lambda t: t.booked_at or datetime.min, reverse=True)
     return tickets
 
 
@@ -344,27 +401,123 @@ def get_wallet(
     db: Session = Depends(get_db),
 ):
     crud.ensure_demo_pass_products(db)
-    tickets, passes = crud.get_user_wallet(db, user_id=user_id, mode=mode)
-    pass_out = []
-    for up in passes:
-        product = up.pass_product
-        mode_c = normalize_mode(product.mode_coverage if product else None)
-        op_color = None
-        if product and product.operator:
-            op_color = product.operator.color_hex
-        pass_out.append(
-            schemas.UserPassResponse(
-                id=up.id,
-                pass_id=up.pass_id,
-                name=product.name if product else None,
-                mode_coverage=mode_c,
-                color_hex=color_for_mode(mode_c, op_color),
-                valid_until=up.valid_until,
-                status=up.status,
-                price=product.price if product else None,
-            )
+    ungrouped, trips, passes = crud.get_user_wallet(db, user_id=user_id, mode=mode)
+    trip_out = [_trip_response(trip, mode=mode) for trip in trips]
+    return schemas.WalletResponse(
+        trips=trip_out,
+        tickets=ungrouped,
+        passes=_pass_responses(passes),
+    )
+
+
+@router.get("/trips", response_model=list[schemas.TicketTripResponse])
+def list_trips(
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    trips = crud.list_user_ticket_trips(db, user_id=user_id)
+    return [_trip_response(trip) for trip in trips]
+
+
+@router.post("/trips", response_model=schemas.TicketTripResponse)
+def create_trip(
+    data: schemas.TicketTripCreate,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        trip = crud.create_ticket_trip(
+            db,
+            user_id=user_id,
+            name=data.name,
+            notes=data.notes,
+            travel_date=data.travel_date,
         )
-    return schemas.WalletResponse(tickets=tickets, passes=pass_out)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _trip_response(trip)
+
+
+@router.get("/trips/{trip_id}", response_model=schemas.TicketTripResponse)
+def get_trip(
+    trip_id: int,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    trip = crud.get_ticket_trip(db, user_id=user_id, trip_id=trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    return _trip_response(trip)
+
+
+@router.patch("/trips/{trip_id}", response_model=schemas.TicketTripResponse)
+def update_trip(
+    trip_id: int,
+    data: schemas.TicketTripUpdate,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    trip, err = crud.update_ticket_trip(
+        db,
+        user_id=user_id,
+        trip_id=trip_id,
+        name=data.name,
+        notes=data.notes,
+        travel_date=data.travel_date,
+    )
+    if err:
+        status = 404 if err == "Trip not found" else 400
+        raise HTTPException(status_code=status, detail=err)
+    return _trip_response(trip)
+
+
+@router.delete("/trips/{trip_id}")
+def delete_trip(
+    trip_id: int,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    ok, err = crud.delete_ticket_trip(db, user_id=user_id, trip_id=trip_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail=err)
+    return {"ok": True, "deleted_id": trip_id}
+
+
+@router.post("/trips/{trip_id}/tickets", response_model=schemas.TicketTripResponse)
+def add_tickets_to_trip(
+    trip_id: int,
+    data: schemas.TicketTripTicketsRequest,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    trip, err = crud.add_tickets_to_trip(
+        db,
+        user_id=user_id,
+        trip_id=trip_id,
+        ticket_ids=data.ticket_ids,
+    )
+    if err:
+        status = 404 if "not found" in err.lower() else 400
+        raise HTTPException(status_code=status, detail=err)
+    return _trip_response(trip)
+
+
+@router.delete("/trips/{trip_id}/tickets/{ticket_id}", response_model=schemas.TicketTripResponse)
+def remove_ticket_from_trip(
+    trip_id: int,
+    ticket_id: int,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    trip, err = crud.remove_ticket_from_trip(
+        db,
+        user_id=user_id,
+        trip_id=trip_id,
+        ticket_id=ticket_id,
+    )
+    if err:
+        raise HTTPException(status_code=404, detail=err)
+    return _trip_response(trip)
 
 
 @router.get("/tickets/{ticket_id}", response_model=schemas.BookingResponse)

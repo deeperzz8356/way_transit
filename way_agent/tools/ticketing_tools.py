@@ -40,9 +40,15 @@ def list_wallet_tickets(user_id: int, mode: Optional[str] = None) -> str:
     """List tickets in the user's unified wallet. Optionally filter by mode: rail, metro, bus, cab, other."""
     db = _db()
     try:
-        tickets, _ = crud.get_user_wallet(
+        ungrouped, trips, _ = crud.get_user_wallet(
             db, user_id=user_id, mode=mode if mode and mode != "all" else None
         )
+        mode_n = normalize_mode(mode) if mode and mode != "all" else None
+        tickets = list(ungrouped)
+        for trip in trips:
+            for t in trip.tickets or []:
+                if mode_n is None or t.mode == mode_n:
+                    tickets.append(t)
         if not tickets:
             return "Wallet is empty for that filter."
         lines = [_format_ticket(t) for t in tickets[:20]]
@@ -103,12 +109,21 @@ def wallet_context_for_user(user_id: int) -> str:
     """Plain-text wallet summary injected into agent db_context."""
     db = _db()
     try:
-        tickets, passes = crud.get_user_wallet(db, user_id=user_id)
-        if not tickets and not passes:
+        ungrouped, trips, passes = crud.get_user_wallet(db, user_id=user_id)
+        tickets = list(ungrouped)
+        for trip in trips:
+            tickets.extend(trip.tickets or [])
+        if not tickets and not passes and not trips:
             return "USER WALLET: empty."
         lines = ["USER WALLET TICKETS:"]
         for t in tickets[:15]:
             lines.append(_format_ticket(t))
+        if trips:
+            lines.append("USER TRIPS:")
+            for trip in trips[:10]:
+                lines.append(
+                    f"trip_id={trip.id} name={trip.name} tickets={len(trip.tickets or [])}"
+                )
         if passes:
             lines.append("USER PASSES:")
             for p in passes[:10]:
