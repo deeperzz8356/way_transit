@@ -1,5 +1,5 @@
 # WAY Transit MVP 🚌
-
+uvicorn main:app --reload
 A complete transit/booking system MVP built with FastAPI (backend) + React (frontend).
 
 **Status:** ✅ MVP Complete - Ready to test end-to-end

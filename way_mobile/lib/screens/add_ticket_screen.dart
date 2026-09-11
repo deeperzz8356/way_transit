@@ -9,6 +9,7 @@ import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
 import '../widgets/create_trip_sheet.dart';
+import '../services/auth_service.dart';
 
 class AddTicketScreen extends StatefulWidget {
   /// When set, new tickets are saved into this trip by default.
@@ -69,9 +70,11 @@ class _AddTicketScreenState extends State<AddTicketScreen> {
   }
 
   Future<void> _ensureAuth() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    _api.setToken(token ?? 'dev-token');
+    final authService = AuthService(_api);  // ✅ Use _api, not new instance
+    final isLoggedIn = await authService.ensureAuthLoaded();
+    if (!isLoggedIn) {
+      return;
+    }
   }
 
   Future<void> _loadTrips() async {

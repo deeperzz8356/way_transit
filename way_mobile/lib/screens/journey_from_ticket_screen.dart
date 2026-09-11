@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class JourneyFromTicketScreen extends StatefulWidget {
   final Booking ticket;
@@ -53,8 +54,16 @@ class _JourneyFromTicketScreenState extends State<JourneyFromTicketScreen> {
   Future<void> _complete() async {
     setState(() => _completing = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _api.setToken(prefs.getString('token') ?? 'dev-token');
+      final authService = AuthService(_api);
+      final isLoggedIn = await authService.ensureAuthLoaded();
+      
+      if (!isLoggedIn) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in first'))
+        );
+        return;
+      }
       await _api.completeJourney(widget.ticket.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

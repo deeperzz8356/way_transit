@@ -39,6 +39,7 @@ class ApiConfig {
   static const String firebaseAuth = '/auth/firebase';
   static const String searchRoutes = '/search/routes';
   static const String searchStops = '/search/stops';
+  static const String searchTrips = '/search/trips';
   static const String bookRoute = '/booking/book';
   static const String myBookings = '/booking/my-bookings';
   static const String wallet = '/booking/wallet';
@@ -59,6 +60,13 @@ class ApiConfig {
   static String tripTickets(int id) => '/booking/trips/$id/tickets';
   static String tripTicket(int tripId, int ticketId) =>
       '/booking/trips/$tripId/tickets/$ticketId';
+
+  // Travel History & Statistics
+  static const String trips = '/trips';
+  static const String statsOverview = '/stats/overview';
+  static String tripDetail(int id) => '/trips/$id';
+  static String deleteTrip(int id) => '/trips/$id';
+  static String updateTrip(int id) => '/trips/$id';
 
   static String resolveUrl(String pathOrUrl) {
     if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {

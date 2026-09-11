@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
+import '../nav/app_nav.dart';
 import 'login_flow.dart';
+import 'my_trips_screen.dart';
+import 'my_stats_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -33,6 +36,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<User> _loadUser() async {
+    // ✅ IMPORTANT: Ensure token is loaded and API service is configured
+    final hasToken = await _authService.ensureAuthLoaded();
+    if (!hasToken) {
+      throw Exception('No authentication token found. Please login again.');
+    }
+
     final user = await _authService.getCurrentUser();
     _nameController.text = user.name ?? '';
     return user;
@@ -61,6 +70,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _authService.updateProfileName(name);
       _refreshUser();
       setState(() => _statusMessage = 'Profile updated successfully.');
+
+      // ✅ Notify HomeScreen to refresh the greeting with new name
+      AppNav.notifyProfileUpdated();
     } catch (e) {
       setState(() => _statusMessage = 'Failed to update profile: $e');
     } finally {
@@ -85,10 +97,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Delete account'),
-          content: const Text('This will permanently delete your account. Continue?'),
+          content: const Text(
+            'This will permanently delete your account. Continue?',
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
           ],
         );
       },
@@ -105,7 +125,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete account: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete account: $e')));
     }
   }
 
@@ -130,11 +152,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Unable to load profile.', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Unable to load profile.',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 16),
-                    Text(snapshot.error.toString(), textAlign: TextAlign.center),
+                    Text(
+                      snapshot.error.toString(),
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 24),
-                    ElevatedButton(onPressed: _refreshUser, child: const Text('Retry')),
+                    ElevatedButton(
+                      onPressed: _refreshUser,
+                      child: const Text('Retry'),
+                    ),
                   ],
                 ),
               ),
@@ -161,7 +195,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (_statusMessage != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      child: Text(_statusMessage!, style: const TextStyle(color: Color(0xFF5974FF))),
+                      child: Text(
+                        _statusMessage!,
+                        style: const TextStyle(color: Color(0xFF5974FF)),
+                      ),
                     ),
                   const SizedBox(height: 24),
                   _buildBottomActions(),
@@ -203,18 +240,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
             'Provider: ${user.authProvider ?? 'local'}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
           ),
         ],
       ),
@@ -269,7 +300,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Edit Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1B35))),
+          const Text(
+            'Edit Profile',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A1B35),
+            ),
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: _nameController,
@@ -277,7 +315,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               labelText: 'Name',
               filled: true,
               fillColor: const Color(0xFFF4F6FB),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -285,12 +326,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _isSaving ? null : _saveName,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             child: Text(_isSaving ? 'Saving...' : 'Save Profile'),
           ),
+          const SizedBox(height: 24),
+          Text(
+            'Travel History & Stats',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildTravelButton(
+            icon: Icons.history,
+            label: 'My Trips',
+            backgroundColor: const Color(0xFFEBF0FF),
+            onPressed: () => _navigateToTrips(),
+          ),
+          const SizedBox(height: 12),
+          _buildTravelButton(
+            icon: Icons.bar_chart,
+            label: 'My Stats',
+            backgroundColor: const Color(0xFFEBF0FF),
+            onPressed: () => _navigateToStats(),
+          ),
           const SizedBox(height: 20),
-          Text('Account details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700])),
+          Text(
+            'Account details',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
           const SizedBox(height: 12),
           _buildAccountDetail('Email', user.email ?? 'Not provided'),
           const SizedBox(height: 8),
@@ -300,6 +373,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildTravelButton({
+    required IconData icon,
+    required String label,
+    required Color backgroundColor,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: const Color(0xFF5974FF),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          elevation: 0,
+        ),
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _navigateToTrips() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MyTripsScreen()),
+    );
+    // Refresh user data after returning from trips
+    _refreshUser();
+  }
+
+  Future<void> _navigateToStats() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MyStatsScreen()),
+    );
+    // Refresh user data after returning from stats
+    _refreshUser();
   }
 
   Widget _buildAccountDetail(String label, String value) {
@@ -314,7 +433,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A1B35))),
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1B35),
+            ),
+          ),
           Text(value, style: const TextStyle(color: Color(0xFF8C90A3))),
         ],
       ),
@@ -328,13 +453,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _buildMenuButton('Logout', Colors.white, _logout),
           const SizedBox(height: 12),
-          _buildMenuButton('Delete Account', const Color(0xFFFFE5E5), _deleteAccount, textColor: const Color(0xFFFF4444)),
+          _buildMenuButton(
+            'Delete Account',
+            const Color(0xFFFFE5E5),
+            _deleteAccount,
+            textColor: const Color(0xFFFF4444),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuButton(String text, Color bgColor, VoidCallback onPressed, {Color? textColor}) {
+  Widget _buildMenuButton(
+    String text,
+    Color bgColor,
+    VoidCallback onPressed, {
+    Color? textColor,
+  }) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(

@@ -56,6 +56,9 @@ dependencies:
   qr_flutter: ^4.1.0
   image_picker: ^1.0.7
   
+  # Markdown rendering for AI responses
+  flutter_markdown: ^0.6.18
+  
   # Firebase authentication and social login
   firebase_core: ^3.15.2
   firebase_auth: ^5.7.0

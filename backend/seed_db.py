@@ -1,5 +1,5 @@
 """
-Script to seed the database with sample GTFS-like routes.
+Script to seed the database with sample GTFS-like routes and ride providers.
 Run this after creating tables: python backend/seed_db.py
 """
 from database import SessionLocal, engine
@@ -7,11 +7,48 @@ from models import Base
 import crud
 import models
 
+def _seed_ride_providers(db):
+    """Seed available ride providers (mock, uber, etc.)."""
+    providers_to_seed = [
+        {
+            "name": "mock",
+            "display_name": "Mock Provider (Demo)",
+            "is_active": True,
+            "is_sandbox": True,
+            "config": '{"note": "Simulated provider for development and testing"}',
+        },
+        {
+            "name": "uber",
+            "display_name": "Uber",
+            "is_active": False,  # Inactive until credentials are provided
+            "is_sandbox": False,
+            "config": '{"api_version": "v1", "mode": "guest_rides", "note": "Requires UBER_CLIENT_ID and UBER_CLIENT_SECRET"}',
+        },
+    ]
+
+    for provider_data in providers_to_seed:
+        existing = db.query(models.RideProvider).filter_by(name=provider_data["name"]).first()
+        if existing:
+            # Update if already exists
+            for key, value in provider_data.items():
+                setattr(existing, key, value)
+            db.commit()
+            print(f"Updated provider: {provider_data['name']}")
+        else:
+            # Create new
+            provider = models.RideProvider(**provider_data)
+            db.add(provider)
+            db.commit()
+            print(f"Seeded provider: {provider_data['name']}")
+
 def init_db():
     """Create tables and seed with sample data."""
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    
+
+    # ── Seed ride providers ────────────────────────────────────────────────
+    _seed_ride_providers(db)
+
     existing_routes = {
         (route.source, route.destination, route.transport, route.departure_time, route.arrival_time, route.price)
         for route in db.query(models.Route).all()

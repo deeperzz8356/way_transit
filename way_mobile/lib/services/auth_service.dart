@@ -29,6 +29,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     _apiService.setToken(token);
+    print('✅ Token saved: ${token.substring(0, 20)}... (length: ${token.length})');
   }
 
   // Get token from local storage
@@ -36,13 +37,19 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
     if (token != null) {
+      print('📝 Token found in storage: ${token.substring(0, 20)}... (length: ${token.length})');
       if (_isTokenExpired(token)) {
+        print('⏰ Token expired, logging out');
         await logout();
         return null;
       }
       _apiService.setToken(token);
+      return token;
     }
-    return token;
+    // Token not found in storage
+    print('❌ No token in storage');
+    _apiService.setToken(null);
+    return null;
   }
 
   bool _isTokenExpired(String token) {
@@ -108,23 +115,53 @@ class AuthService {
     return token != null;
   }
 
+  // Ensure token is loaded and API service is set
+  // Returns true if logged in, false otherwise
+  Future<bool> ensureAuthLoaded() async {
+    final token = await getToken();
+    if (token == null) {
+      _apiService.setToken(null);
+      return false;
+    }
+    _apiService.setToken(token);
+    return true;
+  }
+
   // Get current user
   Future<app_user.User> getCurrentUser() async {
     await getToken();
     return await _apiService.getCurrentUser();
   }
 
-  // Sign in with Google (uses Firebase signInWithPopup on Web)
+  // Sign in with Google (uses Firebase signInWithRedirect on Web, popup on Mobile)
   Future<void> signInWithGoogle() async {
     if (kIsWeb) {
+      // ✅ FIX: Use signInWithRedirect instead of signInWithPopup
+      // This is the modern, recommended approach for Flutter Web
+      // Avoids Cross-Origin-Opener-Policy issues with popups
       final googleProvider = firebase_auth.GoogleAuthProvider();
-      final userCredential = await _firebaseAuth.signInWithPopup(googleProvider);
-      final firebaseUser = userCredential.user;
-      if (firebaseUser == null) throw Exception('Google sign-in failed');
-      await _handleFirebaseSignIn(accountEmail: firebaseUser.email);
-      return;
+      
+      // Set custom parameters for better UX
+      googleProvider.setCustomParameters({
+        'prompt': 'select_account', // Always show account selection
+      });
+      
+      try {
+        await _firebaseAuth.signInWithRedirect(googleProvider);
+        // After redirect, app will resume here
+        // No need to manually navigate - listener will handle it
+        return;
+      } on firebase_auth.FirebaseAuthException catch (e) {
+        // Handle Firebase auth errors
+        print("Firebase Auth Error: ${e.code} - ${e.message}");
+        rethrow;
+      } catch (e) {
+        print("Google sign-in error: $e");
+        rethrow;
+      }
     }
 
+    // Mobile flow (unchanged)
     final GoogleSignInAccount? account = await _googleSignIn.signIn();
     if (account == null) throw Exception('Google sign-in aborted');
 
@@ -274,10 +311,17 @@ class AuthService {
       throw Exception('Firebase ID token not available');
     }
 
+    print('🔐 Sending Firebase token to backend: ${idToken.substring(0, 20)}...');
     final resp = await _apiService.firebaseAuth(idToken);
+    print('📦 Backend response: $resp');
+    
     final token = resp['access_token'] as String?;
-    if (token == null) throw Exception('Backend authentication failed');
+    if (token == null) {
+      print('❌ Backend did not return access_token');
+      throw Exception('Backend authentication failed');
+    }
 
+    print('🎉 Received access_token from backend: ${token.substring(0, 20)}...');
     await saveToken(token);
     await saveUserEmail(firebaseUser.email ?? accountEmail ?? firebaseUser.phoneNumber ?? '');
   }
